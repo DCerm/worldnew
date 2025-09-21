@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RiMenuLine, RiCloseLine } from "react-icons/ri";
 
-export default function HeaderLayout({ children }: { children: React.ReactNode }) {
+export default function HeaderLayout() {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
