@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+:root {
+  --background: ;
+  --foreground: #000;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: ;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  overflow-x: hidden;
+}
+
+section {
+    padding:100px 50px;
+    color:;
+}
+
+h1, h2, h3, h4, h5 {font-family: ;}
+
+
+.vtx {
+  text-orientation: sideways;
+  writing-mode: sideways-lr;
+}
+
+.topSection {
+    margin-top:-10vh
+}
+
+a:hover .rh45 {transform:rotate(45deg); transition: 0.1s ease-out;}
+
+
+@media screen and (max-width: 1300px) {
+    section {
+        padding: 70px 30px;
+    }
+    p {
+        font-size: 18px;
+    }
+}
+
+@media screen and (max-width: 700px) {
+    section {
+        padding: 50px 20px;
+    }
+    .topSection {
+        margin-top:-11vh
+    }
+    th, td {padding: 0;}
+} 
