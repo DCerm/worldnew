@@ -5,7 +5,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RiMenuLine, RiCloseLine } from "react-icons/ri";
-import Footer from "./footer"; // adjust path if Footer is elsewhere
 
 export default function HeaderLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
