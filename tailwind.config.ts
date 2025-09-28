@@ -14,7 +14,7 @@ export default {
       },
       backgroundImage: {
         'hero' : ' url("https://res.cloudinary.com/dzfqshhzu/image/upload/v1758472075/worldnew/worldnewbanner_qj2qot.webp")',
-        'hero2': ' url("https://res.cloudinary.com/dzfqshhzu/image/upload/v1757701746/FarmTrustNetwork/african-american-farmer-presenting-box-tomatoes-camera_482257-77581_wiflxc.jpg")'
+        'abouthero': ' url("/planet-edge.png")'
         
       },
       fontSize: {
@@ -41,12 +41,7 @@ export default {
         'green': '#3A7D44',
     },
       backgroundColor: {
-        'green' : '#3a7d44',
-        'greener' : '#143c14',
-        'lgreen' : '#91f5ad',
-        'coffee' : '#6B4F3F',
-        'orange': '#d3750aff',
-        'sand' : '#d4b483'
+        'dark' : '#1f1f1f',
         
       },
       textColor: {

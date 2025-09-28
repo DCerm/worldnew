@@ -9,9 +9,9 @@ import {
 
 export default function Footer() {
   return (
-    <footer className="bg-[#001f3f] text-white p-2 lg:px-10p flex flex-col md:flex-row justify-between items-center w-full mt-6">
+    <footer className="bg-dark text-white p-2 lg:px-10p flex flex-col md:flex-row justify-between items-center w-full mt-6">
       {/* Left side (branding + links) */}
-      <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
+      <div className="flex flex-col md:flex-row gap-6 items-center">
         {/* Branding */}
         <div className="flex gap-2 font-bold text-xl">
           <p>World.</p>
@@ -38,11 +38,11 @@ export default function Footer() {
       {/* Right side (social icons + button) */}
       <div className="flex gap-4 items-center mt-6 md:mt-0">
         {/* Social Icons */}
-        <div className="flex gap-3">
-          <RiInstagramLine className="bg-white text-[#001f3f] w-8 h-8 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
-          <RiYoutubeLine className="bg-white text-[#001f3f] w-8 h-8 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
-          <RiTiktokLine className="bg-white text-[#001f3f] w-8 h-8 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
-          <RiTwitterXLine className="bg-white text-[#001f3f] w-8 h-8 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
+        <div className="flex gap-3 ">
+          <RiInstagramLine className="bg-white text-[#001f3f] w-6 h-6 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
+          <RiYoutubeLine className="bg-white text-[#001f3f] w-6 h-6 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
+          <RiTiktokLine className="bg-white text-[#001f3f] w-6 h-6 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
+          <RiTwitterXLine className="bg-white text-[#001f3f] w-6 h-6 flex items-center justify-center rounded hover:bg-transparent hover:text-white transition" />
         </div>
 
         {/* Get Started Button */}

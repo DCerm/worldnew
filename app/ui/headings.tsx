@@ -12,7 +12,7 @@ function H2({className, text} : {className: string, text: string}) {
 }
 function H3({className, text} : {className: string, text: string}) {
     return (
-        <h3 className={ className + ' text-3xl' }>{text}</h3>
+        <h3 className={ className + ' text-25px lg:text-30px font-semibold' }>{text}</h3>
     )
 }
 function H4({className, text} : {className: string, text: string}) {

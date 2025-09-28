@@ -24,7 +24,7 @@ export default function HeaderLayout() {
   return (
     <div className="flex flex-col">
       {/* Fixed header */}
-      <header className="bg-[#001f3f] fixed w-full z-50 text-white p-4 flex justify-between items-center lg:px-20p">
+      <header className="bg-dark fixed w-full z-50 text-white p-4 flex justify-between items-center lg:px-20p">
         {/* Logo */}
         <Link href="/" className="font-bold text-xl">
           World. New.
@@ -52,7 +52,7 @@ export default function HeaderLayout() {
       </header>
 
       {/* Push content below header */}
-      <div className="pt-[64px] flex-1">
+      <div className="pt-[54px] flex-1">
         {/* Sidebar */}
         {sidebarOpen && (
           <aside className="fixed inset-y-0 left-0 w-64 bg-[#001f3f] text-white p-6 z-50 flex flex-col transform transition-transform duration-300 ease-in-out">
