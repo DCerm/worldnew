@@ -30,13 +30,13 @@ export default function RootLayout({
       >
         {children}
       </body>
-      <Script src="https://www.googletagmanager.com/gtag/js?id=" />
+      <Script src="https://www.googletagmanager.com/gtag/js?id=G-9675N3CMWM" />
       <Script id="gtag" strategy="lazyOnload">
             {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', '');
+            gtag('config', 'G-9675N3CMWM');
             `}
       </Script>
 
