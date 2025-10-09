@@ -28,7 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         open={open}
         isMobile={isMobile}
         onToggleAction={toggleSidebar}
-        className="transition-all duration-300 z-40"
+        
       />
 
       {/* Overlay for mobile */}
