@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { RiChat3Fill } from "react-icons/ri";
 
 type Tab = "home" | "media" | "community";
