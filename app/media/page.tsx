@@ -1,12 +1,10 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 //import { useState } from 'react';
 import { RiArrowLeftLine } from 'react-icons/ri';
 
 export default function DashboardPage() {
-  const router = useRouter();
 
   const videoCategories = [
     {

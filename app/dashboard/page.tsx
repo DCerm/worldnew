@@ -8,8 +8,6 @@ type Tab = "home" | "media" | "community";
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
 
   const user = {
     name: "David Smith",
@@ -20,22 +18,7 @@ export default function ProfilePage() {
       "https://res.cloudinary.com/dzfqshhzu/image/upload/v1758472075/worldnew/worldnewbanner_qj2qot.webp",
   };
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
 
-  const handleResize = () => {
-    const mobile = window.innerWidth < 1024; // lg breakpoint
-    setIsMobile(mobile);
-    if (mobile) setSidebarOpen(false);
-  };
-
-  useEffect(() => {
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const uploadCover = () => alert("Upload cover clicked");
-  const uploadProfile = () => alert("Upload profile image clicked");
 
   return (
         <>
