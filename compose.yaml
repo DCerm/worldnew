@@ -9,7 +9,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://worldnew:worldnew@postgres:5432/worldnew
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://31.97.117.24:3000
       WORDPRESS_BASE_URL: http://localhost:10019
       WORDPRESS_LOGIN_URL: http://localhost:10019/my-account/
       WORDPRESS_CHECKOUT_URL: http://localhost:10019/checkout/
