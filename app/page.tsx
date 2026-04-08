@@ -20,8 +20,8 @@ export default async function HomePage() {
     <main className="min-h-screen bg-stone-950 text-white">
       <header className="sticky top-0 z-40 border-b border-stone-800 bg-stone-950/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-md font-semibold uppercase tracking-[0.28em] text-[#0091ff]">
-            World. New.
+          <Link href="/" className="text-md font-semibold uppercase tracking-[0.28em] text-[#0091ff] flex gap-2">
+            World. New. <span className="hidden lg:block"> Community</span>
           </Link>
           <nav className="flex items-center gap-4 text-md text-stone-300">
             <Link href="/about" className="hidden lg:block hover:text-white">

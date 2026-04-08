@@ -178,7 +178,7 @@ export async function loginAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   // ── Local database authentication ───────────────────────────────────────
-  const rows = await sql<{
+  let rows: {
     id: string;
     password_hash: string | null;
     roles: string[] | null;
@@ -188,33 +188,51 @@ export async function loginAction(formData: FormData) {
     avatar_url: string | null;
     cover_image_url: string | null;
     active_plan_code: string | null;
-  }[]>`
-    select
-      u.id,
-      u.password_hash,
-      u.display_name,
-      u.username,
-      u.bio,
-      u.avatar_url,
-      u.cover_image_url,
-      coalesce(array_agg(distinct r.code::text) filter (where r.code is not null), '{}'::text[]) as roles,
-      (
-        select mp.code::text
-        from user_subscriptions us
-        join membership_plans mp on mp.id = us.membership_plan_id
-        where us.user_id = u.id
-          and us.status = 'active'
-          and (us.ends_at is null or us.ends_at > now())
-        order by us.starts_at desc
-        limit 1
-      ) as active_plan_code
-    from users u
-    left join user_roles ur on ur.user_id = u.id
-    left join roles r on r.id = ur.role_id
-    where u.email = ${email}
-    group by u.id
-    limit 1
-  `;
+  }[] = [];
+
+  try {
+    rows = await sql<{
+      id: string;
+      password_hash: string | null;
+      roles: string[] | null;
+      display_name: string | null;
+      username: string | null;
+      bio: string | null;
+      avatar_url: string | null;
+      cover_image_url: string | null;
+      active_plan_code: string | null;
+    }[]>`
+      select
+        u.id,
+        u.password_hash,
+        u.display_name,
+        u.username,
+        u.bio,
+        u.avatar_url,
+        u.cover_image_url,
+        coalesce(array_agg(distinct r.code::text) filter (where r.code is not null), '{}'::text[]) as roles,
+        (
+          select mp.code::text
+          from user_subscriptions us
+          join membership_plans mp on mp.id = us.membership_plan_id
+          where us.user_id = u.id
+            and us.status = 'active'
+            and (us.ends_at is null or us.ends_at > now())
+          order by us.starts_at desc
+          limit 1
+        ) as active_plan_code
+      from users u
+      left join user_roles ur on ur.user_id = u.id
+      left join roles r on r.id = ur.role_id
+      where u.email = ${email}
+      group by u.id
+      limit 1
+    `;
+  } catch (error) {
+    console.error("loginAction database query failed", error);
+    await setToast("Unable to sign in right now. Please try again shortly.", "error");
+    redirect("/login?error=Unable to reach authentication service.");
+  }
 
   const user = rows[0];
 
@@ -223,7 +241,13 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=Invalid email or password.");
   }
 
-  await createSession(user.id);
+  try {
+    await createSession(user.id);
+  } catch (error) {
+    console.error("createSession failed during login", error);
+    await setToast("Unable to create your session right now.", "error");
+    redirect("/login?error=Unable to establish a session.");
+  }
   await setToast("Signed in successfully.");
 
   // redirect() is fine here — we are navigating entirely within the Next.js
