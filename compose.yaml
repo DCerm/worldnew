@@ -1,0 +1,45 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://worldnew:worldnew@postgres:5432/worldnew
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      WORDPRESS_BASE_URL: http://localhost:10019
+      WORDPRESS_LOGIN_URL: http://localhost:10019/my-account/
+      WORDPRESS_CHECKOUT_URL: http://localhost:10019/checkout/
+      WORDPRESS_AUTH_API_URL: http://host.docker.internal:10019/wp-json/worldnew/v1/auth/login
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: worldnew
+      POSTGRES_USER: worldnew
+      POSTGRES_PASSWORD: worldnew
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/worldnew_schema.sql:/docker-entrypoint-initdb.d/001-worldnew_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U worldnew -d worldnew"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

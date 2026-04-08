@@ -22,7 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, []);
 
   return (
-    <div className="flex h-screen bg-neutral-950 text-white relative overflow-hidden">
+    <div className="flex h-screen bg-gray-100 text-white relative overflow-hidden">
       {/* Sidebar */}
       <AdminSidebar
         open={open}
@@ -40,7 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Mobile Header */}
-      <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-neutral-900 border-b border-gray-800 shadow fixed w-full z-20">
+      <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-800 shadow fixed w-full z-20">
         <button onClick={toggleSidebar} className="text-2xl">
           <RiMenuLine className="text-xl" />
         </button>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { grotesk } from './ui/fonts';
 import "./globals.css";
 import Script from 'next/script';
+import ToastBridge from "./ui/toast-bridge";
 
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body
         className={` ${grotesk.className} text-black antialiased`}
       >
+        <ToastBridge />
         {children}
       </body>
       <Script src="https://www.googletagmanager.com/gtag/js?id=G-9675N3CMWM" />

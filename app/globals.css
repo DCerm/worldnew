@@ -4,27 +4,34 @@
 
 
 :root {
-  --background: ;
+  --background: #ffffff;
   --foreground: #000;
+  --font-worldnew-sans: "Bricolage Grotesque", Avenir, "Segoe UI", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: ;
+    --background: #050505;
     --foreground: #ededed;
   }
 }
 
 body {
+  background: var(--background);
+  color: var(--foreground);
   overflow-x: hidden;
 }
 
 section {
     padding:100px 50px;
-    color:;
+    color: inherit;
 }
 
-h1, h2, h3, h4, h5 {font-family: ;}
+h1, h2, h3, h4, h5 {font-family: var(--font-worldnew-sans);}
+
+.font-worldnew-sans {
+  font-family: var(--font-worldnew-sans);
+}
 
 
 .vtx {

@@ -2,7 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { RiArrowLeftSLine, RiBarChart2Line, RiMenuLine, RiMovieLine, RiMusic2Line, RiPriceTag3Line, RiUser3Line } from 'react-icons/ri';
+import {
+  RiArrowLeftSLine,
+  RiMenuLine,
+  RiMovieLine,
+  RiMusic2Line,
+  RiPriceTag3Line,
+  RiLogoutBoxRLine,
+  RiPlayCircleLine,
+  RiUserLine,
+} from 'react-icons/ri';
 
 interface AdminSidebarProps {
   open: boolean;
@@ -11,11 +20,11 @@ interface AdminSidebarProps {
 }
 
 const links = [
-  { label: 'Audios', path: '/admin', icon: <RiMusic2Line /> },
-  { label: 'Videos', path: '/admin/videos', icon: <RiMovieLine/> },
+  { label: 'Overview', path: '/admin', icon: <RiMusic2Line /> },
+  { label: 'Add Media', path: '/admin/videos', icon: <RiMovieLine/> },
   { label: 'Categories', path: '/admin/categories', icon: <RiPriceTag3Line /> },
-  { label: 'Analytics', path: '/admin/analytics', icon: <RiBarChart2Line /> },
-  { label: 'Profile', path: '/admin/profile', icon: <RiUser3Line /> },
+  { label: 'View Media', path: '/media', icon: <RiPlayCircleLine /> },
+  { label: 'Profile', path: '/admin/profile', icon: <RiUserLine /> },
 ];
 
 export default function AdminSidebar({ open, isMobile, onToggleAction }: AdminSidebarProps) {
@@ -62,10 +71,12 @@ export default function AdminSidebar({ open, isMobile, onToggleAction }: AdminSi
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-700">
-        <button className="w-full flex items-center gap-3 text-red-500 hover:text-red-600 transition-colors duration-200 font-medium">
-          <i className="ri-logout-circle-r-line text-xl"></i>
-          {(open || isMobile) && <span>Sign Out</span>}
-        </button>
+        <form action="/logout" method="post">
+          <button type="submit" className="w-full flex items-center gap-3 text-red-500 hover:text-red-600 transition-colors duration-200 font-medium">
+            <RiLogoutBoxRLine className="text-xl" />
+            {(open || isMobile) && <span>Sign Out</span>}
+          </button>
+        </form>
       </div>
     </aside>
   );

@@ -23,12 +23,9 @@ export default {
         'md' : '16px',
         'lg' : '17px',
         'xl' : '20px',
-        '2xl' : '3.5vw',
         '25px': '25px',
         '30px': '30px',
-        '3xl' : '6vw',
-        '4xl' : '8vw',
-        'mxl' : '12vw',
+        
       },
       spacing: {
         'pw-full': 'calc(100vw - 20px)',
