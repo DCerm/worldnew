@@ -68,6 +68,23 @@ function extensionFromFile(file: File, mediaType: "audio" | "video") {
   return mediaType === "audio" ? "mp3" : "mp4";
 }
 
+function extensionFromImage(file: File) {
+  const filename = file.name || "";
+  const extFromName = sanitizeExtension(filename.split(".").pop() ?? "");
+
+  if (extFromName) {
+    return extFromName;
+  }
+
+  const mime = file.type.toLowerCase();
+
+  if (mime.startsWith("image/")) {
+    return sanitizeExtension(mime.replace("image/", "")) || "jpg";
+  }
+
+  return "jpg";
+}
+
 async function setToast(message: string, type: ToastLevel = "success") {
   const cookieStore = await cookies();
   const payload = encodeURIComponent(
@@ -115,6 +132,36 @@ async function saveUploadedMediaFile(
   await writeFile(destination, Buffer.from(bytes));
 
   return `/uploads/media/${filename}`;
+}
+
+async function saveUploadedPosterFile(
+  mediaId: string,
+  file: FormDataEntryValue | null
+) {
+  if (!(file instanceof File) || file.size <= 0) {
+    return null;
+  }
+
+  const maxBytes = 20 * 1024 * 1024; // 20 MB poster cap
+  if (file.size > maxBytes) {
+    return null;
+  }
+
+  if (file.type && !file.type.startsWith("image/")) {
+    return null;
+  }
+
+  const uploadsDir = path.join(process.cwd(), "public", "uploads", "posters");
+  await mkdir(uploadsDir, { recursive: true });
+
+  const extension = extensionFromImage(file);
+  const filename = `${mediaId}.${extension}`;
+  const destination = path.join(uploadsDir, filename);
+  const bytes = await file.arrayBuffer();
+
+  await writeFile(destination, Buffer.from(bytes));
+
+  return `/uploads/posters/${filename}`;
 }
 
 export async function registerAction(formData: FormData) {
@@ -461,6 +508,7 @@ export async function createMediaAction(formData: FormData): Promise<ActionOutco
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   const playbackUrlInput = String(formData.get("playbackUrl") ?? "").trim();
   const mediaFile = formData.get("mediaFile");
+  const posterFile = formData.get("posterFile");
   const posterImageUrl = String(formData.get("posterImageUrl") ?? "").trim();
   const planCode = String(formData.get("planCode") ?? "").trim();
   const tags = String(formData.get("tags") ?? "")
@@ -478,7 +526,9 @@ export async function createMediaAction(formData: FormData): Promise<ActionOutco
 
   const mediaId = randomUUID();
   const uploadedPlaybackUrl = await saveUploadedMediaFile(mediaId, mediaType, mediaFile);
+  const uploadedPosterUrl = await saveUploadedPosterFile(mediaId, posterFile);
   const playbackUrl = playbackUrlInput || uploadedPlaybackUrl || "";
+  const nextPosterImageUrl = uploadedPosterUrl || posterImageUrl || null;
 
   if (!playbackUrl) {
     await setToast("Add a media file or playback URL.", "error");
@@ -526,7 +576,7 @@ export async function createMediaAction(formData: FormData): Promise<ActionOutco
           ${visibility},
           ${categoryId || null},
           ${user.id},
-          ${posterImageUrl || null},
+          ${nextPosterImageUrl},
           ${playbackUrl || null},
           ${JSON.stringify(tags)}::jsonb,
           ${JSON.stringify(metadata)}::jsonb,
@@ -590,6 +640,7 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   const playbackUrlInput = String(formData.get("playbackUrl") ?? "").trim();
   const mediaFile = formData.get("mediaFile");
+  const posterFile = formData.get("posterFile");
   const posterImageUrl = String(formData.get("posterImageUrl") ?? "").trim();
   const planCode = String(formData.get("planCode") ?? "").trim();
   const tags = String(formData.get("tags") ?? "")
@@ -605,6 +656,7 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
   }
 
   const uploadedPlaybackUrl = await saveUploadedMediaFile(mediaId, mediaType, mediaFile);
+  const uploadedPosterUrl = await saveUploadedPosterFile(mediaId, posterFile);
 
   try {
     await sql.begin(async (tx) => {
@@ -631,7 +683,8 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
         throw new Error("missing_playback");
       }
 
-      const nextPosterImageUrl = posterImageUrl || existing.poster_image_url;
+      const nextPosterImageUrl =
+        uploadedPosterUrl || posterImageUrl || existing.poster_image_url;
       const metadata = {
         is_featured: isFeatured,
         featured_artists: featuredArtists || null,

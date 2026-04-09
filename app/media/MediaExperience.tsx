@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { AuthUser } from "@/lib/auth";
 import type { MediaCard } from "@/lib/data";
@@ -52,6 +52,103 @@ function getVisibilityLabelClient(visibility: MediaCard["visibility"]) {
     default:
       return "Restricted";
   }
+}
+
+function VideoFramePoster({
+  playbackUrl,
+  className,
+}: {
+  playbackUrl: string;
+  className?: string;
+}) {
+  const [frameUrl, setFrameUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const video = document.createElement("video");
+    video.src = playbackUrl;
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = "anonymous";
+
+    const cleanup = () => {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    const captureFrame = () => {
+      if (isCancelled || !video.videoWidth || !video.videoHeight) {
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        return;
+      }
+
+      try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        setFrameUrl(canvas.toDataURL("image/jpeg", 0.8));
+      } catch {
+        // Cross-origin and codec issues can block canvas extraction.
+      }
+    };
+
+    const onLoadedData = () => {
+      try {
+        const target =
+          Number.isFinite(video.duration) && video.duration > 0
+            ? Math.min(1.2, video.duration / 3)
+            : 0.1;
+        video.currentTime = target;
+      } catch {
+        captureFrame();
+      }
+    };
+
+    video.addEventListener("loadeddata", onLoadedData);
+    video.addEventListener("seeked", captureFrame);
+    video.load();
+
+    return () => {
+      isCancelled = true;
+      video.removeEventListener("loadeddata", onLoadedData);
+      video.removeEventListener("seeked", captureFrame);
+      cleanup();
+    };
+  }, [playbackUrl]);
+
+  if (frameUrl) {
+    return <img src={frameUrl} alt="" className={`${className ?? ""} object-cover`} />;
+  }
+
+  return <div className={`${className ?? ""} bg-gradient-to-br from-[#0091ff]/25 via-stone-900 to-black`} />;
+}
+
+function MediaPoster({
+  item,
+  className,
+}: {
+  item: MediaCard;
+  className?: string;
+}) {
+  if (item.posterImageUrl) {
+    return <img src={item.posterImageUrl} alt={`${item.title} poster`} className={`${className ?? ""} object-cover`} />;
+  }
+
+  if (item.mediaType === "video" && item.playbackUrl) {
+    return <VideoFramePoster playbackUrl={item.playbackUrl} className={className} />;
+  }
+
+  return (
+    <div className={`${className ?? ""} bg-gradient-to-br from-[#0091ff]/25 via-stone-900 to-black`} />
+  );
 }
 
 export default function MediaExperience({ user, media }: Props) {
@@ -156,36 +253,41 @@ export default function MediaExperience({ user, media }: Props) {
         </div>
       </div>
 
-      <section className="mx-auto grid max-w-7xl gap-8 px-4 lg:px-0 py-8 grid-cols-1 lg:grid-cols-3 ">
-        <div className="space-y-8 lg:col-span-2 overflow-x-auto">
+      <section className="mx-auto grid max-w-7xl gap-8 overflow-x-hidden px-4 py-8 lg:grid-cols-3 lg:px-0">
+        <div className="min-w-0 space-y-8 lg:col-span-2">
           {videoGroups.map(([category, items]) => (
-            <div key={category} className="space-y-4">
-              <div className="flex items-center justify-between w-full">
-                <h2 className="text-2xl font-semibold">{category}</h2>
+            <div key={category} className="min-w-0 space-y-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <h2 className="min-w-0 flex-1 truncate text-xl font-semibold sm:text-2xl">{category}</h2>
                 <Link
                   href={`/media/category/${items[0].categorySlug ?? "uncategorized"}`}
-                  className="text-sm font-semibold text-[#0091ff]"
+                  className="flex-none whitespace-nowrap text-sm font-semibold text-[#0091ff]"
                 >
                   View all
                 </Link>
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-2">
+              <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-2 pr-1 snap-x snap-mandatory">
                 {items.map((item) => {
                   const allowed = canAccessMediaClient(user, item);
                   return (
-                    <article key={item.id} className="min-w-[280px]  rounded-2xl border border-white/10 bg-stone-950/70">
-                      <div className="h-44 bg-gradient-to-br from-[#0091ff]/25 via-stone-900 to-black p-2 rounded-xl">
-                        <div className="flex h-full flex-col justify-between rounded-xl border border-white/10 bg-black/30 p-3">
-                          <p className="text-xs uppercase tracking-[0.2em] text-stone-300">{item.mediaType}</p>
-                          <h3 className="text-xl font-semibold">{item.title}</h3>
+                    <article
+                      key={item.id}
+                      className="w-[78vw] max-w-[340px] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 bg-stone-950/70 sm:w-[320px]"
+                    >
+                      <div className="relative h-44 overflow-hidden rounded-t-xl">
+                        <MediaPoster item={item} className="h-full w-full" />
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+                        <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
+                          <p className="text-xs uppercase tracking-[0.2em] text-stone-200">{item.mediaType}</p>
+                          {item.isFeatured && <span className="text-xs font-semibold text-[#7ec4ff]">FEATURED</span>}
                         </div>
                       </div>
                       <div className="space-y-3 p-4">
+                        <h3 className="text-xl font-semibold">{item.title}</h3>
                         <div className="flex items-center justify-between">
                           <span className="rounded-full border border-white/20 px-2 py-1 text-xs text-stone-300">
                             {getVisibilityLabelClient(item.visibility)}
                           </span>
-                          {item.isFeatured && <span className="text-xs font-semibold text-[#0091ff]">FEATURED</span>}
                         </div>
                         <div className="flex items-center gap-2">
                           <Link href={`/media/watch/${item.id}`} className="rounded-full bg-[#0091ff] px-4 py-2 text-xs font-semibold">
@@ -224,6 +326,9 @@ export default function MediaExperience({ user, media }: Props) {
                 const allowed = canAccessMediaClient(user, item);
                 return (
                   <article key={item.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                    <div className="mb-3 h-36 overflow-hidden rounded-lg border border-white/10">
+                      <MediaPoster item={item} className="h-full w-full" />
+                    </div>
                     <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{item.categoryName ?? "General"}</p>
                     <h3 className="mt-1 text-lg font-semibold">{item.title}</h3>
                     {allowed && item.playbackUrl ? (

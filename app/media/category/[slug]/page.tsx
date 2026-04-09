@@ -79,8 +79,14 @@ export default async function MediaCategoryPage({
               const allowed = canAccessMedia(user, item);
               return (
                 <article key={item.id} className="overflow-hidden rounded-2xl border border-white/10 bg-stone-950">
-                  <div className="h-52 bg-gradient-to-br from-[#0091ff]/20 via-stone-900 to-black p-4">
-                    <div className="flex h-full flex-col justify-between rounded-xl border border-white/10 bg-black/30 p-4">
+                  <div className="relative h-52 overflow-hidden">
+                    {item.posterImageUrl ? (
+                      <img src={item.posterImageUrl} alt={`${item.title} poster`} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full bg-gradient-to-br from-[#0091ff]/20 via-stone-900 to-black" />
+                    )}
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+                    <div className="absolute inset-4 flex flex-col justify-between rounded-xl border border-white/10 bg-black/30 p-4">
                       <span className="text-xs uppercase tracking-[0.2em] text-stone-300">{item.mediaType}</span>
                       <h2 className="text-2xl font-semibold">{item.title}</h2>
                     </div>

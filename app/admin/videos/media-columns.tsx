@@ -295,13 +295,19 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                 className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
               />
               <input
+                name="posterFile"
+                type="file"
+                accept="image/*"
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+              />
+              <input
                 name="playbackUrl"
                 placeholder="Playback URL (optional if file is uploaded)"
                 className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
               />
               <input
                 name="posterImageUrl"
-                placeholder="Poster image URL"
+                placeholder="Poster image URL (optional)"
                 className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
               />
               <input
@@ -417,6 +423,12 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                 name="mediaFile"
                 type="file"
                 accept="audio/*,video/*"
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+              />
+              <input
+                name="posterFile"
+                type="file"
+                accept="image/*"
                 className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
               />
               <input
