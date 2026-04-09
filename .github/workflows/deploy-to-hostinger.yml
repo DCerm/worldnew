@@ -19,5 +19,4 @@ jobs:
           docker-compose-path: docker/docker-compose.yml
           environment-variables: |
             NODE_ENV=production
-            API_URL=https://hpanel.hostinger.com
             DATABASE_URL=${{ secrets.DATABASE_URL }}
