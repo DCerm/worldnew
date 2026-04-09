@@ -15,9 +15,9 @@ jobs:
         with:
           api-key: ${{ secrets.HOSTINGER_API_KEY }}
           virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
-          project-name: my-awesome-app
+          project-name: worldnew-community
           docker-compose-path: docker/docker-compose.yml
           environment-variables: |
             NODE_ENV=production
-            API_URL=https://api.example.com
+            API_URL=https://hpanel.hostinger.com
             DATABASE_URL=${{ secrets.DATABASE_URL }}
