@@ -1,12 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import AdminSidebar from './sidenav';
+import { useEffect, useRef, useState } from 'react';
 import { RiAdminLine, RiMenuLine } from 'react-icons/ri';
+import AdminSidebar from './sidenav';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(true);
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const previousIsMobileRef = useRef<boolean | null>(null);
 
   const toggleSidebar = () => setOpen((prev) => !prev);
 
@@ -14,45 +20,59 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const handleResize = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      if (mobile) setOpen(false);
+
+      if (previousIsMobileRef.current === null) {
+        previousIsMobileRef.current = mobile;
+        setOpen(!mobile);
+        setIsReady(true);
+        return;
+      }
+
+      if (mobile && previousIsMobileRef.current === false) {
+        setOpen(false);
+      }
+
+      if (!mobile && previousIsMobileRef.current === true) {
+        setOpen(true);
+      }
+
+      previousIsMobileRef.current = mobile;
+      setIsReady(true);
     };
+
     handleResize();
     window.addEventListener('resize', handleResize);
+
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return (
-    <div className="flex h-screen bg-gray-100 text-white relative overflow-hidden">
-      {/* Sidebar */}
+    <div className="relative flex h-screen overflow-hidden bg-gray-100 text-white">
       <AdminSidebar
         open={open}
         isMobile={isMobile}
         onToggleAction={toggleSidebar}
-        
       />
 
-      {/* Overlay for mobile */}
-      {open && isMobile && (
+      {isReady && open && isMobile ? (
         <div
-          className="fixed inset-0 bg-black/50 z-30"
+          className="fixed inset-0 z-30 bg-black/50"
           onClick={toggleSidebar}
-        ></div>
-      )}
+        />
+      ) : null}
 
-      {/* Mobile Header */}
-      <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-800 shadow fixed w-full z-20">
+      <header className="fixed z-20 flex w-full items-center justify-between border-b border-gray-800 bg-gray-100 px-4 py-3 shadow lg:hidden">
         <button onClick={toggleSidebar} className="text-2xl">
           <RiMenuLine className="text-xl" />
         </button>
         <div className="flex items-center space-x-3">
-          <RiAdminLine className=" text-lg"/>
+          <RiAdminLine className="text-lg" />
           <span className="font-semibold">Admin Panel</span>
         </div>
       </header>
 
-      {/* Main Content */}
       <main
-        className={`flex-1 transition-all duration-300 p-4 w-full overflow-y-auto ${
+        className={`w-full flex-1 overflow-y-auto p-4 transition-all duration-300 ${
           isMobile ? 'mt-16' : ''
         }`}
       >

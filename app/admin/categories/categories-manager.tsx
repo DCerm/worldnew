@@ -37,7 +37,7 @@ export default function CategoriesManager({ categories }: Props) {
           <button
             type="button"
             onClick={() => setIsAddOpen(true)}
-            className="rounded-full bg-[#0091ff] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#007fe0]"
+            className="rounded-full bg-[#F839A9] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#F839A9]"
           >
             Add New
           </button>
@@ -55,7 +55,7 @@ export default function CategoriesManager({ categories }: Props) {
               <button
                 type="button"
                 onClick={() => setEditingId(category.id)}
-                className="rounded-full border border-[#0091ff] px-4 py-2 text-xs font-semibold text-[#0091ff]"
+                className="rounded-full border border-[#F839A9] px-4 py-2 text-xs font-semibold text-[#F839A9]"
               >
                 Edit
               </button>
@@ -94,7 +94,7 @@ export default function CategoriesManager({ categories }: Props) {
                 className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
               />
               <div className="flex items-center gap-2">
-                <button className="rounded-full bg-[#0091ff] px-4 py-2 text-xs font-semibold text-white">
+                <button className="rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold text-white">
                   Save category
                 </button>
                 <button
@@ -143,7 +143,7 @@ export default function CategoriesManager({ categories }: Props) {
                 className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
               />
               <div className="flex items-center gap-2">
-                <button className="rounded-full bg-[#0091ff] px-4 py-2 text-xs font-semibold text-white">
+                <button className="rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold text-white">
                   Save changes
                 </button>
                 <button

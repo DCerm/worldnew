@@ -39,7 +39,7 @@ export default async function MediaCategoryPage({
         <div>
       <header className="sticky top-0 z-40 border-b border-stone-800 bg-stone-950/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 lg:px-0 py-4">
-          <Link href="/" className="text-md font-semibold uppercase tracking-[0.28em] text-[#0091ff]">
+          <Link href="/" className="text-md font-semibold uppercase tracking-[0.28em] text-[#F839A9]">
             World. New.
           </Link>
           <nav className="flex items-center gap-4 text-md text-stone-300">
@@ -54,7 +54,7 @@ export default async function MediaCategoryPage({
             </Link>
             <Link
               href={user ? dashboardHref : "/login"}
-              className="rounded-full border border-stone-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[#0091ff]"
+              className="rounded-full border border-stone-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[#F839A9]"
             >
               {user ? "Dashboard" : "Sign in"}
             </Link>
@@ -81,9 +81,15 @@ export default async function MediaCategoryPage({
                 <article key={item.id} className="overflow-hidden rounded-2xl border border-white/10 bg-stone-950">
                   <div className="relative h-52 overflow-hidden">
                     {item.posterImageUrl ? (
-                      <img src={item.posterImageUrl} alt={`${item.title} poster`} className="h-full w-full object-cover" />
+                      <img
+                        src={item.posterImageUrl}
+                        alt={`${item.title} poster`}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
-                      <div className="h-full w-full bg-gradient-to-br from-[#0091ff]/20 via-stone-900 to-black" />
+                      <div className="h-full w-full bg-gradient-to-br from-[#F839A9]/20 via-stone-900 to-black" />
                     )}
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
                     <div className="absolute inset-4 flex flex-col justify-between rounded-xl border border-white/10 bg-black/30 p-4">
@@ -97,7 +103,7 @@ export default async function MediaCategoryPage({
                       <span className="rounded-full border border-white/20 px-3 py-1 text-xs text-stone-300">
                         {getVisibilityLabel(item.visibility)}
                       </span>
-                      <Link href={`/media/watch/${item.id}`} className="rounded-full bg-[#0091ff] px-4 py-2 text-xs font-semibold">
+                      <Link href={`/media/watch/${item.id}`} className="rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold">
                         Play
                       </Link>
                     </div>

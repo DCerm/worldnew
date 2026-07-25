@@ -7,7 +7,7 @@ export default function RefundPolicy() {
       <div className="bg-greener py-10 -mt-20" />
       <section className="px-5 lg:px-20p py-24 lg:py-100 rounded-xl">
         <div>
-          <h2 className="text-30px lg:text-2xl font-semibold capitalize text-blue">
+          <h2 className="text-30px lg:text-2xl font-semibold capitalize text-[#F839A9]">
             Refund &amp; Return Policy
           </h2>
           <p className="pb-8 lg:pb-12">Last Updated: 14th Sep 2025</p>
@@ -88,7 +88,7 @@ export default function RefundPolicy() {
           </p>
 
           {/* Disclaimer Section */}
-          <h2 className="text-30px lg:text-2xl font-semibold capitalize text-blue pt-10">
+          <h2 className="text-30px lg:text-2xl font-semibold capitalize text-[#F839A9] pt-10">
             Disclaimer
           </h2>
           <p className="pb-8 lg:pb-12">Last Updated: 14th Sep 2025</p>

@@ -60,6 +60,22 @@ When mapped products are purchased or subscriptions change, the plugin sends sig
 - activate the right membership plan
 - keep gated media access aligned
 
+## Subscription verification pull
+
+The app can also make a signed server-to-server call to:
+
+- `POST /wp-json/worldnew/v1/subscription/status`
+
+This gives a current membership snapshot for a user (plan, status, dates) and acts as a reconciliation fallback in case a webhook is delayed or missed.
+
+## Plan pricing sync
+
+When an admin updates membership prices in the app, the app can push signed updates to:
+
+- `POST /wp-json/worldnew/v1/plans/sync`
+
+This updates WooCommerce product pricing so the amount charged in WordPress stays aligned with the app admin settings.
+
 ## Shortcode
 
 Place this on any page:

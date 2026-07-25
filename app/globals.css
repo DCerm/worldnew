@@ -6,7 +6,7 @@
 :root {
   --background: #ffffff;
   --foreground: #000;
-  --font-worldnew-sans: "Bricolage Grotesque", Avenir, "Segoe UI", sans-serif;
+  --font-worldnew-sans: var(--font-bricolage), "Bricolage Grotesque", Avenir, "Segoe UI", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { AuthUser } from "@/lib/auth";
 import type { MediaCard } from "@/lib/data";
+import { SleekAudioPlayer, SleekVideoPlayer } from "@/app/ui/media-player";
 
 type Props = {
   user: AuthUser | null;
@@ -54,100 +55,32 @@ function getVisibilityLabelClient(visibility: MediaCard["visibility"]) {
   }
 }
 
-function VideoFramePoster({
-  playbackUrl,
-  className,
-}: {
-  playbackUrl: string;
-  className?: string;
-}) {
-  const [frameUrl, setFrameUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isCancelled = false;
-    const video = document.createElement("video");
-    video.src = playbackUrl;
-    video.preload = "auto";
-    video.muted = true;
-    video.playsInline = true;
-    video.crossOrigin = "anonymous";
-
-    const cleanup = () => {
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-    };
-
-    const captureFrame = () => {
-      if (isCancelled || !video.videoWidth || !video.videoHeight) {
-        return;
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) {
-        return;
-      }
-
-      try {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        setFrameUrl(canvas.toDataURL("image/jpeg", 0.8));
-      } catch {
-        // Cross-origin and codec issues can block canvas extraction.
-      }
-    };
-
-    const onLoadedData = () => {
-      try {
-        const target =
-          Number.isFinite(video.duration) && video.duration > 0
-            ? Math.min(1.2, video.duration / 3)
-            : 0.1;
-        video.currentTime = target;
-      } catch {
-        captureFrame();
-      }
-    };
-
-    video.addEventListener("loadeddata", onLoadedData);
-    video.addEventListener("seeked", captureFrame);
-    video.load();
-
-    return () => {
-      isCancelled = true;
-      video.removeEventListener("loadeddata", onLoadedData);
-      video.removeEventListener("seeked", captureFrame);
-      cleanup();
-    };
-  }, [playbackUrl]);
-
-  if (frameUrl) {
-    return <img src={frameUrl} alt="" className={`${className ?? ""} object-cover`} />;
-  }
-
-  return <div className={`${className ?? ""} bg-gradient-to-br from-[#0091ff]/25 via-stone-900 to-black`} />;
-}
-
 function MediaPoster({
   item,
   className,
+  fit = "object-cover",
 }: {
   item: MediaCard;
   className?: string;
+  fit?: "object-cover" | "object-contain";
 }) {
   if (item.posterImageUrl) {
-    return <img src={item.posterImageUrl} alt={`${item.title} poster`} className={`${className ?? ""} object-cover`} />;
-  }
-
-  if (item.mediaType === "video" && item.playbackUrl) {
-    return <VideoFramePoster playbackUrl={item.playbackUrl} className={className} />;
+    return (
+      <img
+        src={item.posterImageUrl}
+        alt={`${item.title} poster`}
+        loading="lazy"
+        decoding="async"
+        className={`${className ?? ""} ${fit}`}
+        onError={(event) => {
+          event.currentTarget.style.display = "none";
+        }}
+      />
+    );
   }
 
   return (
-    <div className={`${className ?? ""} bg-gradient-to-br from-[#0091ff]/25 via-stone-900 to-black`} />
+    <div className={`${className ?? ""} bg-gradient-to-br from-[#F839A9]/25 via-stone-900 to-black`} />
   );
 }
 
@@ -187,7 +120,7 @@ export default function MediaExperience({ user, media }: Props) {
     user &&
       (user.roles.includes("artist_admin") || user.roles.includes("super_admin"))
   );
-  const communityHref = isAdminUser ? "/admin?tab=community" : "/dashboard?tab=community";
+  const communityHref = "/community";
   const libraryHref = isAdminUser ? "/admin?tab=home" : "/dashboard?tab=home";
 
   return (
@@ -198,13 +131,13 @@ export default function MediaExperience({ user, media }: Props) {
             { user ? "Back to dashboard" : "Sign In" }
           </Link>
           <nav className="flex flex-wrap items-center gap-3 text-sm">
-            <Link href={communityHref} className="hidden lg:block rounded-full border border-white/20 px-4 py-2 hover:border-[#0091ff]">
+            <Link href={communityHref} className="hidden lg:block rounded-full border border-white/20 px-4 py-2 hover:border-[#F839A9]">
               Community
             </Link>
-            <Link href={libraryHref} className="hidden lg:block rounded-full border border-white/20 px-4 py-2 hover:border-[#0091ff]">
+            <Link href={libraryHref} className="hidden lg:block rounded-full border border-white/20 px-4 py-2 hover:border-[#F839A9]">
               Library
             </Link>
-            <a href="https://worldnew.love" target="_blank" rel="noreferrer" className="rounded-full border border-white/20 px-4 py-2 hover:border-[#0091ff]">
+            <a href="https://worldnew.love" target="_blank" rel="noreferrer" className="rounded-full border border-white/20 px-4 py-2 hover:border-[#F839A9]">
               worldnew.love
             </a>
           </nav>
@@ -212,30 +145,36 @@ export default function MediaExperience({ user, media }: Props) {
       </header>
 
       <div className="relative overflow-hidden border-b border-white/10">
-        {featuredItem?.playbackUrl && featuredItem.mediaType === "video" ? (
-          <video
-            className="h-[55vh] w-full object-cover md:h-[70vh]"
+        {featuredItem?.mediaType === "video" && featuredItem.playbackUrl ? (
+          <SleekVideoPlayer
             src={featuredItem.playbackUrl}
             poster={featuredItem.posterImageUrl ?? undefined}
-            controls
             autoPlay
             muted
-            loop
-            playsInline
+            videoClassName="object-cover"
+            previewLimitSeconds={featuredItem.previewSeconds}
+            loopWithinPreview
+            showControlsOverlay={false}
+            showLoadingOverlay={false}
+            className="h-[55vh] w-full border-0 rounded-none md:h-[70vh]"
           />
+        ) : featuredItem ? (
+          <div className="h-[55vh] w-full md:h-[70vh]">
+            <MediaPoster item={featuredItem} className="h-full w-full" />
+          </div>
         ) : (
-          <div className="h-[55vh] w-full bg-gradient-to-b from-[#0091ff]/20 to-black md:h-[70vh]" />
+          <div className="h-[55vh] w-full bg-gradient-to-b from-[#F839A9]/20 to-black md:h-[70vh]" />
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-7xl px-4 pb-10 lg:px-0">
-          <p className="text-sm uppercase tracking-[0.3em] text-[#0091ff]">Featured Now</p>
+          <p className="text-sm uppercase tracking-[0.3em] text-[#F839A9]">Featured Now</p>
           <h1 className="mt-0 max-w-4xl text-4xl font-bold lg:text-5xl">{featuredItem?.title ?? "Featured Piece"}</h1>
           <p className="mt-4 max-w-2xl text-lg text-stone-300">{featuredItem?.description ?? "This is a featured video piece, published on xxx in the last Europe tour."}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             {featuredItem && (
               <Link
                 href={`/media/watch/${featuredItem.id}`}
-                className="pointer-events-auto rounded-full bg-[#0091ff] px-6 py-3 text-sm font-semibold text-white"
+                className="pointer-events-auto rounded-full bg-[#F839A9] px-6 py-3 text-sm font-semibold text-white"
               >
                 Play
               </Link>
@@ -261,12 +200,12 @@ export default function MediaExperience({ user, media }: Props) {
                 <h2 className="min-w-0 flex-1 truncate text-xl font-semibold sm:text-2xl">{category}</h2>
                 <Link
                   href={`/media/category/${items[0].categorySlug ?? "uncategorized"}`}
-                  className="flex-none whitespace-nowrap text-sm font-semibold text-[#0091ff]"
+                  className="flex-none whitespace-nowrap text-sm font-semibold text-[#F839A9]"
                 >
                   View all
                 </Link>
               </div>
-              <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-2 pr-1 snap-x snap-mandatory">
+              <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-2 pr-1 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/20">
                 {items.map((item) => {
                   const allowed = canAccessMediaClient(user, item);
                   return (
@@ -290,13 +229,13 @@ export default function MediaExperience({ user, media }: Props) {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Link href={`/media/watch/${item.id}`} className="rounded-full bg-[#0091ff] px-4 py-2 text-xs font-semibold">
+                          <Link href={`/media/watch/${item.id}`} className="rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold">
                             Play
                           </Link>
                           <button
                             onClick={() => setSelectedItemId(item.id)}
                             type="button"
-                            className="rounded-full border border-[#0091ff] px-3 py-2 text-xs font-semibold text-[#0091ff]"
+                            className="rounded-full border border-[#F839A9] px-3 py-2 text-xs font-semibold text-[#F839A9]"
                           >
                             View More Info
                           </button>
@@ -316,25 +255,29 @@ export default function MediaExperience({ user, media }: Props) {
         <aside className="space-y-5 rounded-2xl border border-white/10 bg-stone-950/70 p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold">Music</h2>
-            <Link href="/dashboard/music" className="text-sm font-semibold text-[#0091ff]">
+            <Link href="/media/audio" className="text-sm font-semibold text-[#F839A9]">
               View all music
             </Link>
           </div>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {audioItems.length > 0 ? (
               audioItems.slice(0, 8).map((item) => {
                 const allowed = canAccessMediaClient(user, item);
                 return (
-                  <article key={item.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
-                    <div className="mb-3 h-36 overflow-hidden rounded-lg border border-white/10">
-                      <MediaPoster item={item} className="h-full w-full" />
+                  <article key={item.id} className="rounded-xl border border-white/10 bg-black/30 p-2.5">
+                    <div className="mb-2 flex h-44 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
+                      <MediaPoster item={item} fit="object-contain" className="h-full w-full" />
                     </div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-stone-400">{item.categoryName ?? "General"}</p>
-                    <h3 className="mt-1 text-lg font-semibold">{item.title}</h3>
+                    <p className="truncate text-[10px] uppercase tracking-[0.16em] text-stone-400">{item.categoryName ?? "General"}</p>
+                    <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
                     {allowed && item.playbackUrl ? (
-                      <audio className="mt-3 w-full" src={item.playbackUrl} controls />
+                      <SleekAudioPlayer
+                        className="mt-2"
+                        src={item.playbackUrl}
+                        previewLimitSeconds={item.previewSeconds}
+                      />
                     ) : (
-                      <p className="mt-2 text-xs text-stone-400">Locked for your membership level.</p>
+                      <p className="mt-2 text-[11px] text-stone-400">Locked for your membership level.</p>
                     )}
                   </article>
                 );
@@ -363,15 +306,18 @@ export default function MediaExperience({ user, media }: Props) {
 
             <div className="space-y-4">
               {selectedItem.playbackUrl && selectedItem.mediaType === "video" ? (
-                <video
+                <SleekVideoPlayer
                   className="w-full rounded-xl"
-                  src={selectedItem.playbackUrl}
                   poster={selectedItem.posterImageUrl ?? undefined}
-                  controls
+                  src={selectedItem.playbackUrl}
                   autoPlay
+                  previewLimitSeconds={selectedItem.previewSeconds ?? 30}
                 />
               ) : selectedItem.playbackUrl ? (
-                <audio className="w-full" controls src={selectedItem.playbackUrl} />
+                <SleekAudioPlayer
+                  src={selectedItem.playbackUrl}
+                  previewLimitSeconds={selectedItem.previewSeconds}
+                />
               ) : null}
 
               <p className="text-sm text-stone-300">{selectedItem.description ?? "No description provided yet."}</p>

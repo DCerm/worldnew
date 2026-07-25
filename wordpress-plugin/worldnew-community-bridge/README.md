@@ -6,9 +6,15 @@ This plugin connects your WordPress + WooCommerce site to the Next.js community 
 
 - Adds a WordPress settings page for the app URL and shared secret
 - Exposes `wp-json/worldnew/v1/auth/login` for direct community-app credential login
+- Exposes `wp-json/worldnew/v1/subscription/status` for signed subscription verification pulls
+- Exposes `wp-json/worldnew/v1/plans/sync` for signed WooCommerce price sync pushes
+- Exposes `wp-json/worldnew/v1/music/catalog` for the community app audio page
 - Creates signed browser redirects from WordPress into the Next.js app
 - Sends signed WooCommerce order/subscription events to the app
 - Provides a shortcode: `[worldnew_community_button]`
+- Provides a music player shortcode: `[woo_music_streamer]`
+- Adds a per-product "World New Music Track" panel in WooCommerce products
+- Adds a "World New Music" admin catalog page for cleaner music product management
 - Adds a "World New Community" link to the WordPress admin bar for signed-in users
 
 ## Install
@@ -31,6 +37,7 @@ The Next.js app must use the same `WORDPRESS_SSO_SECRET` value.
 The default endpoints expected by this plugin are:
 
 - `/wp-json/worldnew/v1/auth/login`
+- `/wp-json/worldnew/v1/music/catalog`
 - `/api/wordpress/sso`
 - `/api/wordpress/webhooks/woocommerce`
 

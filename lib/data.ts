@@ -1,16 +1,27 @@
 import { withDb } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth";
+import { getWordPressPlanPrices } from "@/lib/wordpress";
+import {
+  createSignedMediaStreamUrl,
+  normalizePreviewSeconds,
+  resolvePublicMediaAssetUrl,
+} from "@/lib/media-stream";
 
 export const DEFAULT_PROFILE_COVER_URL =
   "https://res.cloudinary.com/dzfqshhzu/image/upload/v1758472075/worldnew/worldnewbanner_qj2qot.webp";
 
-type Plan = {
+export type MembershipPlan = {
   id: string;
   code: string;
   name: string;
   description: string;
   priceAmount: string;
+  currencyCode: string;
   durationDays: number;
+  isActive: boolean;
+  sortOrder: number;
+  wordpressProductId: number | null;
+  wordpressVariationId: number | null;
   features: string[];
 };
 
@@ -23,12 +34,16 @@ export type MediaCard = {
   categoryName: string | null;
   categorySlug: string | null;
   playbackUrl: string | null;
+  rawPlaybackUrl: string | null;
   posterImageUrl: string | null;
   createdAt: string;
   planCodes: string[];
   tags: string[];
   featuredArtists: string | null;
   isFeatured: boolean;
+  hiddenFromPublicPages: boolean;
+  previewSeconds: number;
+  fullPlaybackUrl: string | null;
 };
 
 export type FeedPost = {
@@ -60,7 +75,93 @@ export type CategoryRecord = {
   description: string | null;
 };
 
-export async function getMembershipPlans(): Promise<Plan[]> {
+export type CommunityGroupSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  visibility: "public" | "private" | "secret";
+  topicCount: number;
+  memberCount: number;
+};
+
+export type CommunityTopicSummary = {
+  id: string;
+  groupId: string;
+  groupSlug: string;
+  groupName: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  sortOrder: number;
+  threadCount: number;
+};
+
+export type CommunityThreadReply = {
+  id: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+  parentReplyId: string | null;
+};
+
+export type CommunityThreadDetail = {
+  id: string;
+  title: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+  isPinned: boolean;
+  isLocked: boolean;
+  replies: CommunityThreadReply[];
+};
+
+type MediaLibraryOptions = {
+  limit?: number;
+  includeHidden?: boolean;
+};
+
+function normalizeFeatureList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry ?? "").trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((entry) => String(entry ?? "").trim())
+            .filter(Boolean);
+        }
+      } catch {
+        // Fall through to delimiter-based parsing below.
+      }
+    }
+
+    return trimmed
+      .split(/\r?\n|,/g)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+export async function getMembershipPlans(
+  options: { includeInactive?: boolean } = {}
+): Promise<MembershipPlan[]> {
+  const includeInactive = Boolean(options.includeInactive);
+
   return withDb(async (sql) => {
     const rows = await sql<{
       id: string;
@@ -68,24 +169,68 @@ export async function getMembershipPlans(): Promise<Plan[]> {
       name: string;
       description: string | null;
       price_amount: string;
+      currency_code: string;
       duration_days: number;
-      feature_list: string[];
+      is_active: boolean;
+      sort_order: number;
+      wordpress_product_id: number | null;
+      wordpress_variation_id: number | null;
+      feature_list: unknown;
     }[]>`
-      select id, code::text, name, description, price_amount::text, duration_days, feature_list
+      select
+        id,
+        code::text,
+        name,
+        description,
+        price_amount::text,
+        currency_code::text,
+        duration_days,
+        is_active,
+        sort_order,
+        wordpress_product_id,
+        wordpress_variation_id,
+        feature_list
       from membership_plans
-      where is_active = true
+      ${includeInactive ? sql`` : sql`where is_active = true`}
       order by sort_order asc, name asc
     `;
 
-    return rows.map((row) => ({
+    const basePlans = rows.map((row) => ({
       id: row.id,
       code: row.code,
       name: row.name,
       description: row.description ?? "",
       priceAmount: row.price_amount,
+      currencyCode: row.currency_code,
       durationDays: row.duration_days,
-      features: row.feature_list ?? [],
+      isActive: row.is_active,
+      sortOrder: row.sort_order,
+      wordpressProductId: row.wordpress_product_id,
+      wordpressVariationId: row.wordpress_variation_id,
+      features: normalizeFeatureList(row.feature_list),
     }));
+
+    const wordpressPrices = await getWordPressPlanPrices(
+      basePlans.map((plan) => ({
+        planCode: plan.code,
+        productId: plan.wordpressProductId,
+        variationId: plan.wordpressVariationId,
+      }))
+    );
+
+    return basePlans.map((plan) => {
+      const wordpressPrice = wordpressPrices.get(plan.code);
+
+      if (!wordpressPrice?.price_amount) {
+        return plan;
+      }
+
+      return {
+        ...plan,
+        priceAmount: wordpressPrice.price_amount,
+        currencyCode: wordpressPrice.currency || plan.currencyCode,
+      };
+    });
   }, [
     {
       id: "day-pass",
@@ -93,7 +238,12 @@ export async function getMembershipPlans(): Promise<Plan[]> {
       name: "Day Pass",
       description: "A short access pass to sample exclusive songs, videos, and the community.",
       priceAmount: "0.00",
+      currencyCode: "GBP",
       durationDays: 1,
+      isActive: true,
+      sortOrder: 0,
+      wordpressProductId: null,
+      wordpressVariationId: null,
       features: ["Exclusive songs", "Exclusive videos", "Community access"],
     },
     {
@@ -102,7 +252,12 @@ export async function getMembershipPlans(): Promise<Plan[]> {
       name: "Pro Monthly",
       description: "Recurring monthly membership for the full premium experience.",
       priceAmount: "0.00",
+      currencyCode: "GBP",
       durationDays: 30,
+      isActive: true,
+      sortOrder: 1,
+      wordpressProductId: null,
+      wordpressVariationId: null,
       features: ["Everything in Day Pass", "Premium media", "Member-only drops"],
     },
     {
@@ -111,7 +266,12 @@ export async function getMembershipPlans(): Promise<Plan[]> {
       name: "Pro Annual",
       description: "Best value for long-term members with the broadest access.",
       priceAmount: "0.00",
+      currencyCode: "GBP",
       durationDays: 365,
+      isActive: true,
+      sortOrder: 2,
+      wordpressProductId: null,
+      wordpressVariationId: null,
       features: ["Everything in Monthly", "Annual savings", "Priority access"],
     },
   ]);
@@ -139,7 +299,13 @@ export async function getCategories(): Promise<CategoryRecord[]> {
   }, []);
 }
 
-export async function getMediaLibrary(): Promise<MediaCard[]> {
+export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promise<MediaCard[]> {
+  const limit =
+    typeof options.limit === "number" && Number.isFinite(options.limit)
+      ? Math.max(1, Math.min(Math.floor(options.limit), 100))
+      : null;
+  const includeHidden = Boolean(options.includeHidden);
+
   return withDb(async (sql) => {
     const rows = await sql<{
       id: string;
@@ -156,6 +322,120 @@ export async function getMediaLibrary(): Promise<MediaCard[]> {
       tags: string[] | null;
       featured_artists: string | null;
       is_featured: boolean;
+      hidden_from_public_pages: boolean;
+      preview_seconds: number;
+    }[]>`
+      with scoped_media as (
+        select *
+        from media_items
+        where status = 'published'
+          ${
+            includeHidden
+              ? sql``
+              : sql`and lower(coalesce(metadata->>'hide_from_public_pages', 'false')) not in ('true', 't', '1', 'yes', 'on')`
+          }
+        order by created_at desc
+        ${limit ? sql`limit ${limit}` : sql``}
+      )
+      select
+        m.id,
+        m.title,
+        m.description,
+        m.media_type,
+        m.visibility,
+        c.name as category_name,
+        c.slug as category_slug,
+        m.playback_url,
+        m.poster_image_url,
+        m.created_at::text,
+        coalesce(array_agg(distinct mp.code::text) filter (where mp.code is not null), '{}'::text[]) as plan_codes,
+        case
+          when jsonb_typeof(coalesce(m.tags, '[]'::jsonb)) = 'array'
+            then coalesce(array(select jsonb_array_elements_text(m.tags)), '{}'::text[])
+          else '{}'::text[]
+        end as tags,
+        nullif(m.metadata->>'featured_artists', '') as featured_artists,
+        case
+          when lower(coalesce(m.metadata->>'is_featured', 'false')) in ('true', 't', '1', 'yes', 'on')
+            then true
+          else false
+        end as is_featured,
+        case
+          when lower(coalesce(m.metadata->>'hide_from_public_pages', 'false')) in ('true', 't', '1', 'yes', 'on')
+            then true
+          else false
+        end as hidden_from_public_pages,
+        case
+          when nullif(regexp_replace(coalesce(m.metadata->>'preview_seconds', ''), '[^0-9]', '', 'g'), '') is not null
+            then greatest(5, (nullif(regexp_replace(coalesce(m.metadata->>'preview_seconds', ''), '[^0-9]', '', 'g'), ''))::int)
+          else 30
+        end as preview_seconds
+      from scoped_media m
+      left join categories c on c.id = m.category_id
+      left join media_plan_access mpa on mpa.media_item_id = m.id
+      left join membership_plans mp on mp.id = mpa.membership_plan_id
+      group by
+        m.id,
+        m.title,
+        m.description,
+        m.media_type,
+        m.visibility,
+        c.name,
+        c.slug,
+        m.playback_url,
+        m.poster_image_url,
+        m.created_at,
+        m.tags,
+        m.metadata
+      order by m.created_at desc
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      mediaType: row.media_type,
+      visibility: row.visibility,
+      categoryName: row.category_name,
+      categorySlug: row.category_slug,
+      playbackUrl: row.playback_url
+        ? createSignedMediaStreamUrl({ mediaId: row.id, mode: "preview" })
+        : null,
+      rawPlaybackUrl: row.playback_url,
+      posterImageUrl: resolvePublicMediaAssetUrl(row.poster_image_url),
+      createdAt: row.created_at,
+      planCodes: row.plan_codes ?? [],
+      tags: row.tags ?? [],
+      featuredArtists: row.featured_artists,
+      isFeatured: row.is_featured,
+      hiddenFromPublicPages: row.hidden_from_public_pages,
+      previewSeconds: normalizePreviewSeconds(row.preview_seconds),
+      fullPlaybackUrl: row.playback_url
+        ? createSignedMediaStreamUrl({ mediaId: row.id, mode: "full" })
+        : null,
+    }));
+  }, []);
+}
+
+export async function getMediaItemById(mediaId: string): Promise<MediaCard | null> {
+  return withDb(async (sql) => {
+    const rows = await sql<{
+      id: string;
+      title: string;
+      description: string | null;
+      media_type: "audio" | "video";
+      visibility: MediaCard["visibility"];
+      category_name: string | null;
+      category_slug: string | null;
+      playback_url: string | null;
+      poster_image_url: string | null;
+      created_at: string;
+      plan_codes: string[] | null;
+      tags: string[] | null;
+      featured_artists: string | null;
+      is_featured: boolean;
+      hidden_from_public_pages: boolean;
+      preview_seconds: number;
     }[]>`
       select
         m.id,
@@ -179,17 +459,33 @@ export async function getMediaLibrary(): Promise<MediaCard[]> {
           when lower(coalesce(m.metadata->>'is_featured', 'false')) in ('true', 't', '1', 'yes', 'on')
             then true
           else false
-        end as is_featured
+        end as is_featured,
+        case
+          when lower(coalesce(m.metadata->>'hide_from_public_pages', 'false')) in ('true', 't', '1', 'yes', 'on')
+            then true
+          else false
+        end as hidden_from_public_pages,
+        case
+          when nullif(regexp_replace(coalesce(m.metadata->>'preview_seconds', ''), '[^0-9]', '', 'g'), '') is not null
+            then greatest(5, (nullif(regexp_replace(coalesce(m.metadata->>'preview_seconds', ''), '[^0-9]', '', 'g'), ''))::int)
+          else 30
+        end as preview_seconds
       from media_items m
       left join categories c on c.id = m.category_id
       left join media_plan_access mpa on mpa.media_item_id = m.id
       left join membership_plans mp on mp.id = mpa.membership_plan_id
       where m.status = 'published'
+        and m.id = ${mediaId}
       group by m.id, c.name, c.slug
-      order by m.created_at desc
+      limit 1
     `;
 
-    return rows.map((row) => ({
+    const row = rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
       id: row.id,
       title: row.title,
       description: row.description,
@@ -197,20 +493,23 @@ export async function getMediaLibrary(): Promise<MediaCard[]> {
       visibility: row.visibility,
       categoryName: row.category_name,
       categorySlug: row.category_slug,
-      playbackUrl: row.playback_url,
-      posterImageUrl: row.poster_image_url,
+      playbackUrl: row.playback_url
+        ? createSignedMediaStreamUrl({ mediaId: row.id, mode: "preview" })
+        : null,
+      rawPlaybackUrl: row.playback_url,
+      posterImageUrl: resolvePublicMediaAssetUrl(row.poster_image_url),
       createdAt: row.created_at,
       planCodes: row.plan_codes ?? [],
       tags: row.tags ?? [],
       featuredArtists: row.featured_artists,
       isFeatured: row.is_featured,
-    }));
-  }, []);
-}
-
-export async function getMediaItemById(mediaId: string): Promise<MediaCard | null> {
-  const media = await getMediaLibrary();
-  return media.find((item) => item.id === mediaId) ?? null;
+      hiddenFromPublicPages: row.hidden_from_public_pages,
+      previewSeconds: normalizePreviewSeconds(row.preview_seconds),
+      fullPlaybackUrl: row.playback_url
+        ? createSignedMediaStreamUrl({ mediaId: row.id, mode: "full" })
+        : null,
+    };
+  }, null);
 }
 
 export async function getCommunityFeed(): Promise<FeedPost[]> {
@@ -254,8 +553,63 @@ export async function getCommunityFeed(): Promise<FeedPost[]> {
         fc.parent_comment_id::text
       from feed_comments fc
       join users u on u.id = fc.author_id
+      where fc.post_id in (
+        select id
+        from feed_posts
+        order by created_at desc
+        limit 20
+      )
       order by fc.created_at asc
     `;
+
+    const topLevelByPost = new Map<
+      string,
+      Array<{
+        id: string;
+        body: string;
+        authorName: string;
+        createdAt: string;
+        parentCommentId: string | null;
+      }>
+    >();
+    const repliesByParent = new Map<
+      string,
+      Array<{
+        id: string;
+        body: string;
+        authorName: string;
+        createdAt: string;
+      }>
+    >();
+
+    for (const comment of comments) {
+      if (comment.parent_comment_id) {
+        if (!repliesByParent.has(comment.parent_comment_id)) {
+          repliesByParent.set(comment.parent_comment_id, []);
+        }
+
+        repliesByParent.get(comment.parent_comment_id)!.push({
+          id: comment.id,
+          body: comment.body,
+          authorName: comment.author_name ?? "Member",
+          createdAt: comment.created_at,
+        });
+
+        continue;
+      }
+
+      if (!topLevelByPost.has(comment.post_id)) {
+        topLevelByPost.set(comment.post_id, []);
+      }
+
+      topLevelByPost.get(comment.post_id)!.push({
+        id: comment.id,
+        body: comment.body,
+        authorName: comment.author_name ?? "Member",
+        createdAt: comment.created_at,
+        parentCommentId: comment.parent_comment_id,
+      });
+    }
 
     return posts.map((post) => ({
       id: post.id,
@@ -264,25 +618,313 @@ export async function getCommunityFeed(): Promise<FeedPost[]> {
       createdAt: post.created_at,
       authorName: post.author_name ?? "World New",
       mediaTitle: post.media_title,
-      comments: comments
-        .filter((comment) => comment.post_id === post.id && !comment.parent_comment_id)
-        .map((comment) => ({
+      comments: (topLevelByPost.get(post.id) ?? []).map((comment) => ({
           id: comment.id,
           body: comment.body,
-          authorName: comment.author_name ?? "Member",
-          createdAt: comment.created_at,
-          parentCommentId: comment.parent_comment_id,
-          replies: comments
-            .filter((candidate) => candidate.parent_comment_id === comment.id)
-            .map((reply) => ({
-              id: reply.id,
-              body: reply.body,
-              authorName: reply.author_name ?? "Member",
-              createdAt: reply.created_at,
-            })),
+          authorName: comment.authorName,
+          createdAt: comment.createdAt,
+          parentCommentId: comment.parentCommentId,
+          replies: repliesByParent.get(comment.id) ?? [],
         })),
     }));
   }, []);
+}
+
+export async function getCommunityGroups(): Promise<CommunityGroupSummary[]> {
+  return withDb(async (sql) => {
+    const rows = await sql<{
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      sort_order: number;
+      visibility: "public" | "private" | "secret";
+      topic_count: number;
+      member_count: number;
+    }[]>`
+      select
+        g.id,
+        g.slug,
+        g.name,
+        g.description,
+        g.sort_order,
+        g.visibility::text as visibility,
+        count(distinct ct.id)::int as topic_count,
+        count(distinct gm.user_id)::int as member_count
+      from groups g
+      left join community_topics ct on ct.group_id = g.id
+      left join group_members gm on gm.group_id = g.id
+      group by g.id, g.slug, g.name, g.description, g.sort_order, g.visibility
+      order by g.sort_order asc, g.name asc
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      sortOrder: row.sort_order,
+      visibility: row.visibility,
+      topicCount: row.topic_count,
+      memberCount: row.member_count,
+    }));
+  }, []);
+}
+
+export async function getCommunityTopicsByGroupSlug(groupSlug: string): Promise<{
+  group: CommunityGroupSummary | null;
+  topics: CommunityTopicSummary[];
+}> {
+  return withDb(async (sql) => {
+    const groupRows = await sql<{
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      sort_order: number;
+      visibility: "public" | "private" | "secret";
+      topic_count: number;
+      member_count: number;
+    }[]>`
+      select
+        g.id,
+        g.slug,
+        g.name,
+        g.description,
+        g.sort_order,
+        g.visibility::text as visibility,
+        count(distinct ct.id)::int as topic_count,
+        count(distinct gm.user_id)::int as member_count
+      from groups g
+      left join community_topics ct on ct.group_id = g.id
+      left join group_members gm on gm.group_id = g.id
+      where g.slug = ${groupSlug}
+      group by g.id, g.slug, g.name, g.description, g.sort_order, g.visibility
+      limit 1
+    `;
+
+    const group = groupRows[0]
+      ? {
+          id: groupRows[0].id,
+          slug: groupRows[0].slug,
+          name: groupRows[0].name,
+          description: groupRows[0].description,
+          sortOrder: groupRows[0].sort_order,
+          visibility: groupRows[0].visibility,
+          topicCount: groupRows[0].topic_count,
+          memberCount: groupRows[0].member_count,
+        }
+      : null;
+
+    if (!group) {
+      return { group: null, topics: [] };
+    }
+
+    const topicRows = await sql<{
+      id: string;
+      group_id: string;
+      group_slug: string;
+      group_name: string;
+      slug: string;
+      title: string;
+      description: string | null;
+      sort_order: number;
+      thread_count: number;
+    }[]>`
+      select
+        ct.id,
+        ct.group_id,
+        g.slug as group_slug,
+        g.name as group_name,
+        ct.slug,
+        ct.title,
+        ct.description,
+        ct.sort_order,
+        count(distinct cth.id)::int as thread_count
+      from community_topics ct
+      join groups g on g.id = ct.group_id
+      left join community_threads cth on cth.topic_id = ct.id
+      where g.slug = ${groupSlug}
+      group by
+        ct.id,
+        ct.group_id,
+        g.slug,
+        g.name,
+        ct.slug,
+        ct.title,
+        ct.description,
+        ct.sort_order
+      order by ct.sort_order asc, ct.title asc
+    `;
+
+    return {
+      group,
+      topics: topicRows.map((row) => ({
+        id: row.id,
+        groupId: row.group_id,
+        groupSlug: row.group_slug,
+        groupName: row.group_name,
+        slug: row.slug,
+        title: row.title,
+        description: row.description,
+        sortOrder: row.sort_order,
+        threadCount: row.thread_count,
+      })),
+    };
+  }, { group: null, topics: [] });
+}
+
+export async function getCommunityThreadsByTopic(groupSlug: string, topicSlug: string): Promise<{
+  group: CommunityGroupSummary | null;
+  topic: CommunityTopicSummary | null;
+  threads: CommunityThreadDetail[];
+}> {
+  return withDb(async (sql) => {
+    const topicRows = await sql<{
+      group_id: string;
+      group_slug: string;
+      group_name: string;
+      group_description: string | null;
+      group_sort_order: number;
+      group_visibility: "public" | "private" | "secret";
+      member_count: number;
+      topic_id: string;
+      topic_slug: string;
+      topic_title: string;
+      topic_description: string | null;
+      topic_sort_order: number;
+      thread_count: number;
+    }[]>`
+      select
+        g.id as group_id,
+        g.slug as group_slug,
+        g.name as group_name,
+        g.description as group_description,
+        g.sort_order as group_sort_order,
+        g.visibility::text as group_visibility,
+        (
+          select count(*)::int
+          from group_members gm
+          where gm.group_id = g.id
+        ) as member_count,
+        ct.id as topic_id,
+        ct.slug as topic_slug,
+        ct.title as topic_title,
+        ct.description as topic_description,
+        ct.sort_order as topic_sort_order,
+        (
+          select count(*)::int
+          from community_threads cth
+          where cth.topic_id = ct.id
+        ) as thread_count
+      from groups g
+      join community_topics ct on ct.group_id = g.id
+      where g.slug = ${groupSlug}
+        and ct.slug = ${topicSlug}
+      limit 1
+    `;
+
+    const joined = topicRows[0];
+    if (!joined) {
+      return { group: null, topic: null, threads: [] };
+    }
+
+    const threads = await sql<{
+      id: string;
+      title: string;
+      body: string;
+      is_pinned: boolean;
+      is_locked: boolean;
+      created_at: string;
+      author_name: string | null;
+    }[]>`
+      select
+        cth.id,
+        cth.title,
+        cth.body,
+        cth.is_pinned,
+        cth.is_locked,
+        cth.created_at::text,
+        u.display_name as author_name
+      from community_threads cth
+      left join users u on u.id = cth.author_id
+      where cth.topic_id = ${joined.topic_id}
+      order by cth.is_pinned desc, cth.created_at desc
+    `;
+
+    const replies = await sql<{
+      id: string;
+      thread_id: string;
+      parent_reply_id: string | null;
+      body: string;
+      created_at: string;
+      author_name: string | null;
+    }[]>`
+      select
+        ctr.id,
+        ctr.thread_id,
+        ctr.parent_reply_id::text,
+        ctr.body,
+        ctr.created_at::text,
+        u.display_name as author_name
+      from community_thread_replies ctr
+      left join users u on u.id = ctr.author_id
+      where ctr.thread_id in (
+        select id
+        from community_threads
+        where topic_id = ${joined.topic_id}
+      )
+      order by ctr.created_at asc
+    `;
+
+    const repliesByThread = new Map<string, CommunityThreadReply[]>();
+    for (const reply of replies) {
+      if (!repliesByThread.has(reply.thread_id)) {
+        repliesByThread.set(reply.thread_id, []);
+      }
+      repliesByThread.get(reply.thread_id)!.push({
+        id: reply.id,
+        body: reply.body,
+        authorName: reply.author_name ?? "Member",
+        createdAt: reply.created_at,
+        parentReplyId: reply.parent_reply_id,
+      });
+    }
+
+    return {
+      group: {
+        id: joined.group_id,
+        slug: joined.group_slug,
+        name: joined.group_name,
+        description: joined.group_description,
+        sortOrder: joined.group_sort_order,
+        visibility: joined.group_visibility,
+        topicCount: 0,
+        memberCount: joined.member_count,
+      },
+      topic: {
+        id: joined.topic_id,
+        groupId: joined.group_id,
+        groupSlug: joined.group_slug,
+        groupName: joined.group_name,
+        slug: joined.topic_slug,
+        title: joined.topic_title,
+        description: joined.topic_description,
+        sortOrder: joined.topic_sort_order,
+        threadCount: joined.thread_count,
+      },
+      threads: threads.map((thread) => ({
+        id: thread.id,
+        title: thread.title,
+        body: thread.body,
+        authorName: thread.author_name ?? "Member",
+        createdAt: thread.created_at,
+        isPinned: thread.is_pinned,
+        isLocked: thread.is_locked,
+        replies: repliesByThread.get(thread.id) ?? [],
+      })),
+    };
+  }, { group: null, topic: null, threads: [] });
 }
 
 export async function getAdminOverview() {
@@ -303,15 +945,6 @@ export async function getAdminOverview() {
 
 export async function getGlobalProfileCoverUrl(): Promise<string | null> {
   return withDb(async (sql) => {
-    await sql`
-      create table if not exists app_settings (
-        setting_key text primary key,
-        setting_value text,
-        updated_by uuid references users(id) on delete set null,
-        updated_at timestamptz not null default now()
-      )
-    `;
-
     const rows = await sql<{ setting_value: string | null }[]>`
       select setting_value
       from app_settings

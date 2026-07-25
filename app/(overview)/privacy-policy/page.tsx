@@ -1,118 +1,76 @@
+const sections = [
+  {
+    title: "1. Information We Collect",
+    body: "We collect information you provide directly, such as your name, email, profile details, and content you post in the community.",
+  },
+  {
+    title: "2. How We Use Information",
+    body: "We use your information to provide and improve the platform, personalize your experience, communicate product updates, and protect the service from abuse.",
+  },
+  {
+    title: "3. Sharing and Disclosure",
+    body: "We may share data with trusted service providers that support operations such as hosting, analytics, and messaging. We do not sell personal data.",
+  },
+  {
+    title: "4. Data Retention",
+    body: "We retain data for as long as required to provide services, maintain security, meet contractual obligations, and comply with applicable law.",
+  },
+  {
+    title: "5. Security",
+    body: "We apply administrative, technical, and organizational safeguards to protect personal data, though no method of storage or transmission is absolutely secure.",
+  },
+  {
+    title: "6. Your Choices",
+    body: "You can update profile information, manage communication preferences, and request account deletion where supported by law and platform policy.",
+  },
+  {
+    title: "7. Children’s Privacy",
+    body: "Our services are not intended for children under 13. We do not knowingly collect personal information from children under 13.",
+  },
+  {
+    title: "8. Policy Updates",
+    body: "We may revise this policy from time to time. Material updates will be communicated through the platform or by email where appropriate.",
+  },
+];
 
-export default function PrivacyPolicy() {
+export default function PrivacyPolicyPage() {
   return (
-    <>
-      {/*    PRIVACY POLICY */}
+    <main className="min-h-screen bg-stone-950 text-white">
+      <section className="mx-auto w-full max-w-7xl px-6 py-14">
+        <div className="rounded-[2rem] border border-stone-800 bg-gradient-to-r from-[#F839A9]/20 via-stone-900 to-stone-950 p-8 shadow-2xl lg:p-12">
+          <p className="text-xs uppercase tracking-[0.35em] text-[#80c8ff]">Privacy Policy</p>
+          <h1 className="mt-4 text-4xl font-semibold lg:text-5xl">Your data, handled with care.</h1>
+          <p className="mt-4 text-sm text-stone-300">Last updated: September 14, 2025</p>
+          <p className="mt-5 max-w-3xl text-base text-stone-300 lg:text-lg">
+            This policy explains what information we collect, how it is used, and the controls available to you when using World. New.
+          </p>
+        </div>
+      </section>
 
-      <section className=" mt-4 lg:mt-12 px-2.5 lg:px-20p py-6 lg:py-12">
-    {/* Title */}
-    <h1 className="text-25px lg:text-2xl font-bold mb-2">Privacy Policy</h1>
-    <p className="text-sm text-gray-600 mb-6">Last Updated: 14th Sep 2025</p>
+      <section className="mx-auto grid w-full max-w-7xl gap-5 px-6 pb-16 md:grid-cols-2">
+        {sections.map((section) => (
+          <article
+            key={section.title}
+            className="rounded-[1.5rem] border border-stone-800 bg-stone-900/80 p-6 shadow-sm"
+          >
+            <h2 className="text-xl font-semibold">{section.title}</h2>
+            <p className="mt-3 text-sm leading-relaxed text-stone-300">{section.body}</p>
+          </article>
+        ))}
+      </section>
 
-    {/* Intro */}
-    <p className="mb-6">
-      <span className="font-bold">WORLD. NEW.</span> is committed to protecting your privacy. 
-      This privacy policy explains how we collect, use, and share information about you when 
-      you use our software and services.
-    </p>
-
-    {/* Sections */}
-    <div className="space-y-8 text-gray-800 leading-relaxed">
-      <div>
-        <h2 className="font-bold text-xl mb-2">1. Information We Collect</h2>
-        <p>
-          We collect information you provide to us, such as your name and email address, when you sign up 
-          for our services. We also collect information about your use of our services, including the 
-          groups you create and join, and the content you post. Please note that we do not collect payment 
-          information, as this is done securely through Stripe.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">2. How We Use Your Information</h2>
-        <p>
-          We use the information we collect to provide, maintain, and improve our services, to communicate 
-          with you, and to personalize your experience. We never sell any data to advertisers or government 
-          officials, and we go above and beyond to keep your data safe. We also use the information to 
-          prevent fraud and abuse, and to comply with legal obligations.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">3. How We Share Your Information</h2>
-        <p>
-          We may share your information with third-party service providers who perform services on our behalf, 
-          such as payment processing and email marketing. We may also share your information with law 
-          enforcement or government officials when we are legally required to do so.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">4. Your Choices</h2>
-        <p>
-          You can choose to limit the information you provide to us. You can also choose to disable cookies in 
-          your browser settings, although this may affect your ability to use our services.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">5. Data Retention</h2>
-        <p>
-          We retain your information as long as necessary to provide our services, or as required by law. We may 
-          also retain your information after you delete your account for legal, regulatory, or technical reasons.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">6. Data Security</h2>
-        <p>
-          We use top-of-the-line security measures to protect your information from unauthorized access, disclosure, 
-          alteration, or destruction. We go above and beyond to keep your data safe and secure.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">7. Children’s Privacy</h2>
-        <p>
-          Our services are not intended for use by children under the age of 13, and we do not knowingly collect 
-          personal information from children under 13. If we become aware that we have collected personal 
-          information from a child under 13, we will take steps to delete the information as soon as possible.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">8. Group Leaders and Marketing</h2>
-        <p>
-          Please note that all Group leaders have full access to email and SMS information you sign up with and by 
-          signing up you give them full consent to market to you. If you do not wish to receive marketing emails or 
-          messages, you should not sign up for our services.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">9. Changes to this Policy</h2>
-        <p>
-          We may update this privacy policy from time to time. If we make any material changes, we will notify you 
-          by email or by posting a notice on our website.
-        </p>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-xl mb-2">10. Contact Us</h2>
-        <p>
-          If you have any questions or concerns about our privacy policy, please contact us at 
-          <a href="mailto:support@grouped.com" className="text-blue-600 underline"> support@gworldnew.love</a>.
-        </p>
-      </div>
-    </div>
-
-    {/* Agreement Note */}
-    <p className="mt-8 text-sm text-gray-600">
-      By using World. New. whether it be creating or joining a group, you agree to this privacy policy.
-    </p>
-  </section>
-
-      {/* FOOTER */}
-    </>
+      <section className="mx-auto w-full max-w-7xl px-6 pb-16">
+        <article className="rounded-[1.5rem] border border-stone-800 bg-stone-900 p-6">
+          <h3 className="text-xl font-semibold">Contact</h3>
+          <p className="mt-3 text-sm text-stone-300">
+            Questions about this policy can be sent to{" "}
+            <a href="mailto:support@worldnew.love" className="text-[#F839A9] underline">
+              support@worldnew.love
+            </a>
+            .
+          </p>
+        </article>
+      </section>
+    </main>
   );
 }

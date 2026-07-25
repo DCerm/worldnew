@@ -108,6 +108,7 @@ The Next.js app calls WordPress from inside the container. From there:
 
 Use:
 - `WORDPRESS_AUTH_API_URL=http://host.docker.internal:10019/wp-json/worldnew/v1/auth/login`
+- `WORDPRESS_MUSIC_CATALOG_API_URL=http://host.docker.internal:10019/wp-json/worldnew/v1/music/catalog`
 
 Keep browser-facing URLs as `http://localhost:10019` for login and checkout links.
 
@@ -122,6 +123,9 @@ This app now exposes:
 The WordPress plugin exposes:
 
 - `POST /wp-json/worldnew/v1/auth/login`
+- `POST /wp-json/worldnew/v1/subscription/status`
+- `POST /wp-json/worldnew/v1/plans/sync`
+- `GET /wp-json/worldnew/v1/music/catalog`
 
 ### Signature rule
 
@@ -176,7 +180,7 @@ Accepted formats:
     "ends_at": "2026-05-07T00:00:00Z",
     "auto_renews": true,
     "amount": 9.99,
-    "currency": "USD"
+    "currency": "GBP"
   }
 }
 ```
@@ -232,6 +236,9 @@ At minimum, set:
 - `WORDPRESS_LOGIN_URL=https://worldnew.love/my-account/`
 - `WORDPRESS_CHECKOUT_URL=https://worldnew.love/checkout/`
 - `WORDPRESS_AUTH_API_URL=https://worldnew.love/wp-json/worldnew/v1/auth/login`
+- `WORDPRESS_SUBSCRIPTION_STATUS_URL=https://worldnew.love/wp-json/worldnew/v1/subscription/status`
+- `WORDPRESS_PLAN_SYNC_API_URL=https://worldnew.love/wp-json/worldnew/v1/plans/sync`
+- `WORDPRESS_MUSIC_CATALOG_API_URL=https://worldnew.love/wp-json/worldnew/v1/music/catalog`
 - `WORDPRESS_SSO_SECRET=<shared-secret>`
 - `NEXT_PUBLIC_APP_URL=https://community.worldnew.love`
 

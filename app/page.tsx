@@ -7,7 +7,7 @@ export default async function HomePage() {
   const [user, plans, media] = await Promise.all([
     getCurrentUser(),
     getMembershipPlans(),
-    getMediaLibrary(),
+    getMediaLibrary({ limit: 8 }),
   ]);
 
   const featuredMedia = media.slice(0, 4);
@@ -20,7 +20,7 @@ export default async function HomePage() {
     <main className="min-h-screen bg-stone-950 text-white">
       <header className="sticky top-0 z-40 border-b border-stone-800 bg-stone-950/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-md font-semibold uppercase tracking-[0.28em] text-[#0091ff] flex gap-2">
+          <Link href="/" className="text-md font-semibold uppercase tracking-[0.28em] text-[#F839A9] flex gap-2">
             World. New. <span className="hidden lg:block"> Community</span>
           </Link>
           <nav className="flex items-center gap-4 text-md text-stone-300">
@@ -35,7 +35,7 @@ export default async function HomePage() {
             </Link>
             <Link
               href={user ? dashboardHref : "/login"}
-              className="rounded-full border border-stone-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[#0091ff]"
+              className="rounded-full border border-stone-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[#F839A9]"
             >
               {user ? "Dashboard" : "Sign in"}
             </Link>
@@ -45,7 +45,7 @@ export default async function HomePage() {
 
       <section className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-10 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl space-y-6">
-          <p className="text-sm uppercase tracking-[0.4em] text-[#0091ff]">World New Community</p>
+          <p className="text-sm uppercase tracking-[0.4em] text-[#F839A9]">World New Community</p>
           <h1 className="text-4xl font-semibold leading-tight lg:text-5xl">
             Get more of <br className="hidden lg:block" /> the <br className="lg:hidden" /> music you love. ❤️
           </h1>
@@ -55,7 +55,7 @@ export default async function HomePage() {
           <div className="flex flex-wrap gap-2 lg:gap-4">
             <Link
               href={user ? dashboardHref : "/register"}
-              className="rounded-full bg-[#0091ff] px-4 lg:px-6 py-3 font-semibold text-white transition hover:bg-[#007ad9]"
+              className="rounded-full bg-[#F839A9] px-4 lg:px-6 py-3 font-semibold text-white transition hover:bg-[#F839A9]"
             >
               {user ? "My Dashboard" : "Join The Community"}
             </Link>
@@ -91,7 +91,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-2 my-4 lg:my-24">
+      <section id="memberships" className="mx-auto my-4 max-w-7xl scroll-mt-24 px-6 py-2 lg:my-24">
         <div className="mb-6 lg:flex items-end justify-between gap-6">
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-stone-400">Memberships</p>
@@ -109,7 +109,7 @@ export default async function HomePage() {
                   
                 </div>
                 <div className="text-right">
-                  <p className="text-lg lg:text-xl font-semibold">${plan.priceAmount}</p>
+                  <p className="text-lg lg:text-xl font-semibold">£{plan.priceAmount}</p>
                   <p className="text-xs lg:text-sm uppercase tracking-[0.25em] text-stone-500">{plan.durationDays} days</p>
                 </div>
               </div>
@@ -124,7 +124,8 @@ export default async function HomePage() {
               <div className="mt-6">
                 <Link
                   href={user ? `/checkout/${plan.code}?returnTo=/dashboard` : "/login"}
-                  className="inline-flex rounded-full bg-[#0091ff] hover:bg-[#0077cc] px-5 py-2 text-sm font-semibold text-white"
+                  prefetch={false}
+                  className="inline-flex rounded-full bg-[#F839A9] hover:bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white"
                 >
                   {user ? "Purchase membership" : "Sign in to purchase"}
                 </Link>
@@ -140,7 +141,7 @@ export default async function HomePage() {
             <p className="text-sm uppercase tracking-[0.3em] text-stone-400">Media Preview</p>
             <h2 className="mt-2 text-3xl font-semibold">World. New. content shelves</h2>
           </div>
-          <Link href="/media" className="text-sm uppercase tracking-[0.2em] text-[#0091ff] hover:underline underline-offset-[5px]">
+          <Link href="/media" className="text-sm uppercase tracking-[0.2em] text-[#F839A9] hover:underline underline-offset-[5px]">
             View library
           </Link>
         </div>
@@ -149,7 +150,7 @@ export default async function HomePage() {
           {featuredMedia.length > 0 ? (
             featuredMedia.map((item) => (
               <article key={item.id} className="overflow-hidden rounded-[1.75rem] border border-stone-800 bg-stone-900">
-                <div className="h-56 bg-gradient-to-br from-[#0091ff]/20 via-blue-500/10 to-stone-950 p-4">
+                <div className="h-56 bg-gradient-to-br from-[#F839A9]/20 via-[#F839A9]/10 to-stone-950 p-4">
                   <div className="flex h-full flex-col justify-between rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
                     <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-stone-300">
                       <span>{item.mediaType}</span>

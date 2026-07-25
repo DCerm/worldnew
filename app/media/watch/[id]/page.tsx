@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { canAccessMedia, getMediaItemById } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
+import { SleekAudioPlayer, SleekVideoPlayer } from "@/app/ui/media-player";
 
 export default async function WatchMediaPage({
   params,
@@ -32,20 +33,21 @@ export default async function WatchMediaPage({
           <div className="rounded-2xl border border-white/20 bg-black px-6 py-8 text-center text-stone-300">
             This media is locked for your current membership.
           </div>
-        ) : media.playbackUrl ? (
+        ) : media.fullPlaybackUrl ?? media.playbackUrl ? (
           media.mediaType === "video" ? (
-            <video
-              src={media.playbackUrl}
+            <SleekVideoPlayer
+              src={media.fullPlaybackUrl ?? media.playbackUrl!}
               poster={media.posterImageUrl ?? undefined}
-              controls
               autoPlay
-              playsInline
-              
               className="h-full w-full object-contain"
             />
           ) : (
             <div className="w-full max-w-3xl px-6">
-              <audio className="w-full" src={media.playbackUrl} controls autoPlay  />
+              <SleekAudioPlayer
+                className="w-full"
+                src={media.fullPlaybackUrl ?? media.playbackUrl!}
+                autoPlay
+              />
             </div>
           )
         ) : (

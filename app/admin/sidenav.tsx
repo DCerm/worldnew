@@ -4,12 +4,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   RiArrowLeftSLine,
+  RiCoupon2Line,
   RiMenuLine,
   RiMovieLine,
   RiMusic2Line,
+  RiDiscLine,
   RiPriceTag3Line,
   RiLogoutBoxRLine,
   RiPlayCircleLine,
+  RiTeamLine,
   RiUserLine,
 } from 'react-icons/ri';
 
@@ -21,8 +24,11 @@ interface AdminSidebarProps {
 
 const links = [
   { label: 'Overview', path: '/admin', icon: <RiMusic2Line /> },
+  { label: 'Memberships', path: '/admin/memberships', icon: <RiCoupon2Line /> },
+  { label: 'Music Store', path: '/admin/music', icon: <RiDiscLine /> },
   { label: 'Add Media', path: '/admin/videos', icon: <RiMovieLine/> },
   { label: 'Categories', path: '/admin/categories', icon: <RiPriceTag3Line /> },
+  { label: 'Community', path: '/community', icon: <RiTeamLine /> },
   { label: 'View Media', path: '/media', icon: <RiPlayCircleLine /> },
   { label: 'Profile', path: '/admin/profile', icon: <RiUserLine /> },
 ];
@@ -53,20 +59,25 @@ export default function AdminSidebar({ open, isMobile, onToggleAction }: AdminSi
 
       {/* Navigation */}
       <nav className="flex-1 flex flex-col space-y-2 p-4">
-        {links.map((link) => (
+        {links.map((link) => {
+          const href = link.path;
+          const isActive = pathname === link.path;
+
+          return (
           <Link
-            key={link.path}
-            href={link.path}
+            key={href}
+            href={href}
             className={`flex items-center gap-3 px-3 py-2 rounded transition-colors duration-200 ${
-              pathname === link.path
-                ? 'bg-blue-600 text-white font-semibold'
+              isActive
+                ? 'bg-[#F839A9] text-white font-semibold'
                 : 'hover:bg-gray-800'
             }`}
           >
             <i className="text-xl">{link.icon}</i>
             {(open || isMobile) && <span>{link.label}</span>}
           </Link>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer */}

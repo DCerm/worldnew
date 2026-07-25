@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 
+import { normalizeOptionalUrl, resolveAvatarUrl } from "@/lib/avatar";
 import { getSql, withDb } from "@/lib/db";
 
 const SESSION_COOKIE = "worldnew_session";
@@ -183,7 +184,11 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       displayName: user.display_name ?? user.email.split("@")[0],
       username: user.username,
       bio: user.bio,
-      avatarUrl: user.avatar_url,
+      avatarUrl: resolveAvatarUrl({
+        avatarUrl: normalizeOptionalUrl(user.avatar_url),
+        userId: user.id,
+        email: user.email,
+      }),
       coverImageUrl: user.cover_image_url,
       roles: user.roles ?? [],
       activePlanCode: user.active_plan_code,

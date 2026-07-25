@@ -1,15 +1,17 @@
 import React from "react";
 import Link from "next/link";
 
-import { createCommentAction, createCommunityPostAction } from "@/app/actions";
 import { requireUser } from "@/lib/auth";
 import {
   DEFAULT_PROFILE_COVER_URL,
+  getCommunityGroups,
   getCommunityFeed,
   getGlobalProfileCoverUrl,
   getMediaLibrary,
 } from "@/lib/data";
 import Image from "next/image";
+import { resolveAvatarUrl } from "@/lib/avatar";
+import { normalizeOptionalUrl } from "@/lib/avatar";
 
 type DashboardTab = "home" | "community";
 
@@ -19,21 +21,30 @@ export default async function DashboardPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const user = await requireUser();
-  const [feed, media, globalCoverUrl, resolvedSearchParams] = await Promise.all([
-    getCommunityFeed(),
-    getMediaLibrary(),
-    getGlobalProfileCoverUrl(),
-    searchParams,
-  ]);
+  const resolvedSearchParams = await searchParams;
 
   const activeTab = (["home", "community"].includes(resolvedSearchParams.tab ?? "")
     ? resolvedSearchParams.tab
     : "home") as DashboardTab;
 
+  const [feed, media, globalCoverUrl, groups] = await Promise.all([
+    getCommunityFeed(),
+    activeTab === "home" ? getMediaLibrary({ limit: 12 }) : Promise.resolve([]),
+    getGlobalProfileCoverUrl(),
+    activeTab === "community" ? getCommunityGroups() : Promise.resolve([]),
+  ]);
+
   const latestMedia = media.slice(0, 4);
   const latestEvents = feed.slice(0, 5);
   const profileCoverUrl =
-    globalCoverUrl ?? user.coverImageUrl ?? DEFAULT_PROFILE_COVER_URL;
+    normalizeOptionalUrl(globalCoverUrl) ??
+    normalizeOptionalUrl(user.coverImageUrl) ??
+    DEFAULT_PROFILE_COVER_URL;
+  const profileAvatarUrl = resolveAvatarUrl({
+    avatarUrl: user.avatarUrl,
+    userId: user.id,
+    email: user.email,
+  });
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-2 py-8 lg:px-8">
@@ -56,7 +67,7 @@ export default async function DashboardPage({
           <div className="flex w-full items-center gap-4 ">
             <div className="relative h-28 w-28 overflow-hidden rounded-full ring-4 ring-white shadow-lg">
               <Image
-                src={user.avatarUrl ?? DEFAULT_PROFILE_COVER_URL}
+                src={profileAvatarUrl}
                 alt="profile"
                 width={112}
                 height={112}
@@ -74,13 +85,18 @@ export default async function DashboardPage({
                 Membership: {user.activePlanCode ?? "Community access"}
               </div>
               <Link
-                href="/checkout/monthly?returnTo=/dashboard"
-                className="rounded-lg bg-[#0091ff] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#007fe0]"
+                href="/#memberships"
+                prefetch={false}
+                className="rounded-lg bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#F839A9]"
               >
                 Upgrade membership
               </Link>
-            
-            <button className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-stone-700">Gift Membership</button>
+            <Link
+              href="/gift-membership?returnTo=/dashboard"
+              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-stone-700"
+            >
+              Gift Membership
+            </Link>
           </div>
         </div>
 
@@ -90,7 +106,7 @@ export default async function DashboardPage({
               href="/dashboard?tab=home"
               className={`w-1/3 rounded-t-xl pb-3 pt-1 text-center text-md font-semibold transition ${
                 activeTab === "home"
-                  ? "border-b-2 border-[#0091ff] bg-[#0091ff]/10 text-[#0091ff]"
+                  ? "border-b-2 border-[#F839A9] bg-[#F839A9]/10 text-[#F839A9]"
                   : "text-stone-600 hover:border-b-2 hover:border-stone-400 hover:text-stone-900"
               }`}
             >
@@ -106,7 +122,7 @@ export default async function DashboardPage({
               href="/dashboard?tab=community"
               className={`w-1/3 rounded-t-xl pb-3 pt-1 text-center text-md font-semibold transition ${
                 activeTab === "community"
-                  ? "border-b-2 border-[#0091ff] bg-[#0091ff]/10 text-[#0091ff]"
+                  ? "border-b-2 border-[#F839A9] bg-[#F839A9]/10 text-[#F839A9]"
                   : "text-stone-600 hover:border-b-2 hover:border-stone-400 hover:text-stone-900"
               }`}
             >
@@ -133,13 +149,21 @@ export default async function DashboardPage({
             </div>
 
             <div className="space-y-5">
-              <h3 className="text-xl font-bold text-stone-900">Latest media</h3>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xl font-bold text-stone-900">Latest media</h3>
+                <Link
+                  href="/media/audio"
+                  className="rounded-full border border-[#F839A9]/40 px-3 py-1 text-xs font-semibold text-[#F839A9] transition hover:border-[#F839A9] hover:bg-[#F839A9]/10"
+                >
+                  View all audio files
+                </Link>
+              </div>
               {latestMedia.map((item) => (
                 <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                   <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{item.mediaType}</p>
                   <h4 className="mt-1 text-lg font-semibold text-stone-900">{item.title}</h4>
                   <p className="mt-2 text-md text-stone-600">{item.description ?? "New release"}</p>
-                  <Link href={`/media/watch/${item.id}`} className="mt-3 inline-flex rounded-full bg-[#0091ff] px-4 py-2 text-xs font-semibold text-white">
+                  <Link href={`/media/watch/${item.id}`} className="mt-3 inline-flex rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold text-white">
                     Play in fullscreen
                   </Link>
                 </article>
@@ -151,76 +175,43 @@ export default async function DashboardPage({
         {activeTab === "community" && (
           <div className="mt-8 mx-auto space-y-6">
             <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
-              <h3 className="text-2xl font-semibold text-stone-950">Community Forum</h3>
+              <h3 className="text-2xl font-semibold text-stone-950">Community Groups</h3>
               <p className="mt-2 text-md text-stone-500">
-                Central space for member posts, comments, and threaded replies.
+                Explore groups, open a topic channel, then jump into threaded conversations.
               </p>
-              <form action={createCommunityPostAction} className="mt-5 space-y-3">
-                <textarea
-                  name="body"
-                  rows={4}
-                  placeholder="Share an update with the community..."
-                  className="w-full rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-md outline-none transition focus:border-stone-400"
-                />
-                <button className="rounded-full bg-[#0091ff] px-5 py-2 text-md font-semibold text-white">Post</button>
-              </form>
+              <Link
+                href="/community"
+                className="mt-5 inline-flex rounded-full bg-[#F839A9] px-5 py-2 text-md font-semibold text-white"
+              >
+                Open all groups
+              </Link>
             </div>
 
-            {feed.map((post) => (
-              <article key={post.id} className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{post.authorName}</p>
-                    <h4 className="mt-2 text-lg font-semibold text-stone-950">
-                      {post.type === "media_announcement" && post.mediaTitle ? `New drop: ${post.mediaTitle}` : "Community post"}
-                    </h4>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {groups.map((group) => (
+                <Link
+                  key={group.id}
+                  href={`/community/${group.slug}`}
+                  className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+                >
+                  <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{group.visibility}</p>
+                  <h4 className="mt-2 text-lg font-semibold text-stone-950">{group.name}</h4>
+                  <p className="mt-3 text-sm text-stone-700">
+                    {group.description || "Open this group to explore channels and threads."}
+                  </p>
+                  <div className="mt-4 flex gap-3 text-xs text-stone-500">
+                    <span>{group.topicCount} topics</span>
+                    <span>{group.memberCount} members</span>
                   </div>
-                  <span className="text-xs text-stone-500">{new Date(post.createdAt).toLocaleString()}</span>
-                </div>
-                <p className="mt-4 text-md text-stone-700">{post.body}</p>
+                </Link>
+              ))}
+            </div>
 
-                <div className="mt-5 space-y-4 rounded-2xl bg-stone-50 p-4">
-                  {post.comments.map((comment) => (
-                    <div key={comment.id} className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{comment.authorName}</p>
-                      <p className="text-md text-stone-700">{comment.body}</p>
-
-                      {comment.replies.length > 0 && (
-                        <div className="space-y-2 border-l-2 border-stone-200 pl-4">
-                          {comment.replies.map((reply) => (
-                            <div key={reply.id} className="rounded-lg bg-stone-50 p-3">
-                              <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{reply.authorName}</p>
-                              <p className="text-md text-stone-700">{reply.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <form action={createCommentAction} className="flex gap-2">
-                        <input type="hidden" name="postId" value={post.id} />
-                        <input type="hidden" name="parentCommentId" value={comment.id} />
-                        <input
-                          name="body"
-                          placeholder="Reply to this comment..."
-                          className="flex-1 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm outline-none transition focus:border-stone-400"
-                        />
-                        <button className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-white">Reply</button>
-                      </form>
-                    </div>
-                  ))}
-
-                  <form action={createCommentAction} className="flex gap-2">
-                    <input type="hidden" name="postId" value={post.id} />
-                    <input
-                      name="body"
-                      placeholder="Add a comment..."
-                      className="flex-1 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm outline-none transition focus:border-stone-400"
-                    />
-                    <button className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-white">Comment</button>
-                  </form>
-                </div>
+            {groups.length === 0 && (
+              <article className="rounded-[2rem] border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-600 shadow-sm">
+                No groups yet. An artist admin can create the first group from the Community page.
               </article>
-            ))}
+            )}
           </div>
         )}
         </div>

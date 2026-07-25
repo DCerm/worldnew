@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { normalizeOptionalUrl } from "@/lib/avatar";
 import { finishWordPressLogin, verifySignedPayload } from "@/lib/wordpress";
+import { buildPublicUrl } from "@/lib/public-url";
 
 function decodePayload(encodedPayload: string) {
   //const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
@@ -46,8 +48,8 @@ function payloadToUserInput(payload: {
     display_name: payload.display_name ?? null,
     first_name: payload.first_name ?? null,
     last_name: payload.last_name ?? null,
-    avatar_url: payload.avatar_url ?? null,
-    cover_image_url: payload.cover_image_url ?? null,
+    avatar_url: normalizeOptionalUrl(payload.avatar_url),
+    cover_image_url: normalizeOptionalUrl(payload.cover_image_url),
     bio: payload.bio ?? null,
     roles: payload.roles ?? ["member"],
   };
@@ -60,29 +62,30 @@ export async function GET(request: Request) {
     const signature = searchParams.get("signature");
 
     if (!encodedPayload || !signature) {
-      return NextResponse.redirect(new URL("/login?error=missing-wordpress-payload", request.url));
+      return NextResponse.redirect(buildPublicUrl(request, "/login?error=missing-wordpress-payload"));
     }
 
     const { raw, payload } = decodePayload(encodedPayload);
 
     if (!verifySignedPayload(raw, signature)) {
         console.error('Signature mismatch. Raw:', raw, 'Sig:', signature);
-        return NextResponse.redirect(new URL("/login?error=invalid-wordpress-signature", request.url));
+        return NextResponse.redirect(buildPublicUrl(request, "/login?error=invalid-wordpress-signature"));
     }
 
     if (!payload.email || !payload.wordpress_user_id) {
-      return NextResponse.redirect(new URL("/login?error=invalid-wordpress-user", request.url));
+      return NextResponse.redirect(buildPublicUrl(request, "/login?error=invalid-wordpress-user"));
     }
 
     const { destination } = await finishWordPressLogin(payloadToUserInput(payload));
-    const finalDestination = payload.return_to?.startsWith("/") ? payload.return_to : destination;
 
-    return NextResponse.redirect(new URL(finalDestination, request.url));
+    return NextResponse.redirect(buildPublicUrl(request, destination));
   } catch (error) {
     console.error("WordPress GET SSO failed", error);
     // Optionally include error message in redirect (for debugging only)
     const message = encodeURIComponent(error instanceof Error ? error.message : 'unknown');
-    return NextResponse.redirect(new URL(`/login?error=wordpress-sso-failed&details=${message}`, request.url));
+    return NextResponse.redirect(
+      buildPublicUrl(request, `/login?error=wordpress-sso-failed&details=${message}`)
+    );
     //return NextResponse.redirect(new URL("/login?error=wordpress-sso-failed", request.url));
   }
 }
@@ -105,13 +108,9 @@ export async function POST(request: Request) {
 
     const { destination } = await finishWordPressLogin(payloadToUserInput(payload));
 
-    const finalDestination = payload.return_to?.startsWith("/")
-      ? payload.return_to
-      : destination;
-
     return NextResponse.json({
       success: true,
-      redirectTo: finalDestination,
+      redirectTo: destination,
     });
   } catch (error) {
     console.error("WordPress SSO failed", error);

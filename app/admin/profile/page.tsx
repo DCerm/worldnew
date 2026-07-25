@@ -1,15 +1,23 @@
-import { updateGlobalCoverAction, updateProfileAction } from "@/app/actions";
+import {
+  updateGlobalCoverAction,
+  updatePasswordAction,
+  updateProfileAction,
+} from "@/app/actions";
 import { requireAdmin } from "@/lib/auth";
 import {
   DEFAULT_PROFILE_COVER_URL,
   getGlobalProfileCoverUrl,
 } from "@/lib/data";
+import PasswordField from "@/app/ui/password-field";
+import { normalizeOptionalUrl } from "@/lib/avatar";
 
 export default async function AdminProfilePage() {
   const user = await requireAdmin();
   const globalCoverUrl = await getGlobalProfileCoverUrl();
   const profileCoverUrl =
-    globalCoverUrl ?? user.coverImageUrl ?? DEFAULT_PROFILE_COVER_URL;
+    normalizeOptionalUrl(globalCoverUrl) ??
+    normalizeOptionalUrl(user.coverImageUrl) ??
+    DEFAULT_PROFILE_COVER_URL;
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 px-2 py-4 md:px-4">
@@ -24,22 +32,22 @@ export default async function AdminProfilePage() {
             name="displayName"
             defaultValue={user.displayName}
             placeholder="Display name"
-            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
           />
           <textarea
             name="bio"
             defaultValue={user.bio ?? ""}
             rows={4}
             placeholder="Bio"
-            className="w-full rounded-3xl border border-stone-200 px-4 py-3 text-sm"
+            className="w-full rounded-3xl border border-stone-200 px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
           />
           <input
             name="avatarUrl"
             defaultValue={user.avatarUrl ?? ""}
             placeholder="Profile picture URL"
-            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
           />
-          <button className="rounded-full bg-[#0091ff] px-5 py-2 text-sm font-semibold text-white">
+          <button className="rounded-full bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white">
             Save profile
           </button>
         </form>
@@ -60,10 +68,41 @@ export default async function AdminProfilePage() {
             name="globalCoverImageUrl"
             defaultValue={globalCoverUrl ?? ""}
             placeholder="Global cover image URL"
-            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
+            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
           />
-          <button className="rounded-full bg-[#0091ff] px-5 py-2 text-sm font-semibold text-white">
+          <button className="rounded-full bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white">
             Save global cover
+          </button>
+        </form>
+      </section>
+
+      <section className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-semibold text-stone-950">Update Password</h2>
+        <p className="mt-2 text-sm text-stone-500">
+          Set a local app password or rotate your current one.
+        </p>
+
+        <form action={updatePasswordAction} className="mt-6 space-y-4">
+          <PasswordField
+            name="currentPassword"
+            placeholder="Current password"
+            autoComplete="current-password"
+            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
+          />
+          <PasswordField
+            name="newPassword"
+            placeholder="New password"
+            autoComplete="new-password"
+            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
+          />
+          <PasswordField
+            name="confirmPassword"
+            placeholder="Confirm new password"
+            autoComplete="new-password"
+            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
+          />
+          <button className="rounded-full bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white">
+            Update password
           </button>
         </form>
       </section>

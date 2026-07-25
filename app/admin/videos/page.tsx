@@ -6,7 +6,7 @@ export default async function VideosPage() {
   await requireAdmin();
   const [categories, mediaItems, plans] = await Promise.all([
     getCategories(),
-    getMediaLibrary(),
+    getMediaLibrary({ includeHidden: true }),
     getMembershipPlans(),
   ]);
 

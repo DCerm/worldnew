@@ -34,19 +34,9 @@ export default {
         '15p' : '15%',
         '20p' : '20%',
       },
-      color: {
-        'green': '#3A7D44',
-    },
       backgroundColor: {
         'dark' : '#1f1f1f',
         
-      },
-      textColor: {
-        'greener' : '#143c14',
-        'green' : '#3a7d44',
-      },
-      borderColor: {
-        'greener' : '#143c14',
       }
     },
   },

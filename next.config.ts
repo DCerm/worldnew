@@ -1,8 +1,21 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  outputFileTracingRoot: process.cwd(),
+  outputFileTracingRoot: path.join(__dirname),
+  async headers() {
+    return [
+      {
+        source: "/uploads/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ];
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "1gb",

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+const DEVICE_COOKIE = "worldnew_device_id";
+
 function getCanonicalUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL;
 
@@ -17,9 +19,23 @@ function getCanonicalUrl() {
 
 export function middleware(request: NextRequest) {
   const canonical = getCanonicalUrl();
+  const deviceId = request.cookies.get(DEVICE_COOKIE)?.value;
+  const secureCookie = (canonical?.protocol ?? request.nextUrl.protocol) === "https:";
 
   if (!canonical) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+
+    if (!deviceId) {
+      response.cookies.set(DEVICE_COOKIE, globalThis.crypto.randomUUID(), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: secureCookie,
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
+
+    return response;
   }
 
   const incomingHost = request.headers.get("host") ?? "";
@@ -31,10 +47,34 @@ export function middleware(request: NextRequest) {
     const target = request.nextUrl.clone();
     target.protocol = canonical.protocol;
     target.host = canonical.host;
-    return NextResponse.redirect(target);
+    const response = NextResponse.redirect(target);
+
+    if (!deviceId) {
+      response.cookies.set(DEVICE_COOKIE, globalThis.crypto.randomUUID(), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: canonical.protocol === "https:",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
+
+    return response;
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+
+  if (!deviceId) {
+    response.cookies.set(DEVICE_COOKIE, globalThis.crypto.randomUUID(), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: secureCookie,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
+  return response;
 }
 
 export const config = {

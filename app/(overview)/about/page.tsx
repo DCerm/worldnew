@@ -1,157 +1,107 @@
-// app/about/page.tsx (Next.js 13+ App Router example)
-"use client";
+import Link from "next/link";
+import {
+  RiGiftLine,
+  RiMessage3Line,
+  RiMusicLine,
+  RiShakeHandsFill,
+} from "react-icons/ri";
 
-import React from "react";
-import { H2, H3 } from "@/app/ui/headings";
-import { RiGiftLine, RiMessage3Line, RiMusicLine, RiShakeHandsFill } from "react-icons/ri";
+const offerings = [
+  {
+    title: "Exclusive Music",
+    description: "Hear unreleased tracks and alternate versions before public drops.",
+    icon: RiMusicLine,
+  },
+  {
+    title: "Have Your Say",
+    description: "Vote in polls, share feedback, and shape upcoming releases.",
+    icon: RiMessage3Line,
+  },
+  {
+    title: "Giveaways",
+    description: "Access member-only merch drops, ticket opportunities, and rewards.",
+    icon: RiGiftLine,
+  },
+  {
+    title: "Real Community",
+    description: "Build real connections with fans who share your energy and values.",
+    icon: RiShakeHandsFill,
+  },
+];
 
 export default function AboutPage() {
   return (
-    <div className="bg-gray-200 p-0 m-0">
-      {/* Hero Section */}
-      <section className="relative w-full p-2 min-h-[93vh] flex items-center justify-center bg-abouthero bg-bottom bg-cover mt-0">        
-
-        {/* Hero Content */}
-        <div className="relative z-10 text-center px-4 p-2 w-full md:w-4/5 mx-auto">
-          <h1 className="text-4xl sm:text-6xl font-extrabold mb-6 text-white">
-            About World. New.
+    <main className="min-h-screen bg-stone-950 text-white">
+      <section className="mx-auto w-full max-w-7xl px-6 py-14">
+        <div className="rounded-[2rem] border border-stone-800 bg-gradient-to-r from-[#F839A9]/20 via-stone-900 to-stone-950 p-8 shadow-2xl lg:p-12">
+          <p className="text-xs uppercase tracking-[0.35em] text-[#80c8ff]">About World. New.</p>
+          <h1 className="mt-4 text-4xl font-semibold leading-tight lg:text-5xl">
+            A music community built for connection, not just consumption.
           </h1>
-          <p className="text-base sm:text-lg text-gray-200 leading-relaxed lg:px-10p">
-            World. New. isn&apos;t just a fan club — it&apos;s a home for people who love
-            music, connection, and being part of something bigger. Created by{" "}
-            <span className="font-bold text-blue-400">Franke</span>, this
-            community is where fans and music truly come together.
+          <p className="mt-5 max-w-3xl text-base text-stone-300 lg:text-lg">
+            World. New. is where the artist journey and community journey move together.
+            You get closer to the music, closer to the process, and closer to people who
+            genuinely care about growth, creativity, and shared momentum.
           </p>
         </div>
       </section>
 
-      {/* What We Offer */}
-      <section className="p-2 w-full bg-gray-300 md:w-4/5 mx-auto mt-16 px-6 py-16 space-y-20 rounded-lg">
-        <div className="text-center space-y-4">
-            <H3 className="" text="What We Offer" />
-         
-            <p className="text-gray-600 max-w-2xl mx-auto text-lg">
-                Being part of{" "}
-                <span className="font-semibold text-blue-600">World. New.</span>{" "}
-                means more than music — it&apos;s about community, exclusive access, and
-                unforgettable experiences.
-            </p>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Card 1 */}
-          <div className="bg-white rounded-xl shadow-md p-6 text-center hover:shadow-lg transition">
-            <div className="flex justify-center mb-3">
-              <RiMusicLine className="lg:text-2xl text-indigo-600"/>
-            </div>
-            <h3 className="text-xl font-bold mb-2 text-gray-900">
-              Exclusive Music
-            </h3>
-            <p className="text-gray-600">
-              Hear unreleased tracks before anyone else.
-            </p>
-          </div>
-
-          {/* Card 2 */}
-          <div className="bg-gray-50 rounded-xl shadow-md p-6 text-center hover:shadow-lg transition">
-            <div className="flex justify-center mb-3">
-              <RiMessage3Line className="lg:text-2xl text-blue-500" />
-            </div>
-            <h3 className="text-xl font-bold mb-2 text-gray-900">
-              Have Your Say
-            </h3>
-            <p className="text-gray-600">
-              Vote in polls, comment, and shape the drops.
-            </p>
-          </div>
-
-          {/* Card 3 */}
-          <div className="bg-white rounded-xl shadow-md p-6 text-center hover:shadow-lg transition">
-            <div className="flex justify-center mb-3">
-              <RiGiftLine className="lg:text-2xl text-green-600" />
-            </div>
-            <h3 className="text-xl font-bold mb-2 text-gray-900">Giveaways</h3>
-            <p className="text-gray-600">
-              Win exclusive merch and show tickets.
-            </p>
-          </div>
-
-          {/* Card 4 */}
-          <div className="bg-gray-50 rounded-xl shadow-md p-6 text-center hover:shadow-lg transition">
-            <div className="flex justify-center mb-3">
-              <RiShakeHandsFill className="text-2xl text-pink-500" />
-            </div>
-            <h3 className="text-xl font-bold mb-2 text-gray-900">
-              Real Community
-            </h3>
-            <p className="text-gray-600">
-              Meet fans worldwide who share your passion.
-            </p>
-          </div>
-        </div>
+      <section className="mx-auto grid w-full max-w-7xl gap-5 px-6 pb-8 md:grid-cols-2 xl:grid-cols-4">
+        {offerings.map((item) => {
+          const Icon = item.icon;
+          return (
+            <article
+              key={item.title}
+              className="rounded-[1.5rem] border border-stone-800 bg-stone-900/80 p-6 shadow-sm"
+            >
+              <div className="mb-4 inline-flex rounded-full border border-[#F839A9]/40 bg-[#F839A9]/10 p-3 text-[#F839A9]">
+                <Icon className="text-2xl" />
+              </div>
+              <h2 className="text-xl font-semibold">{item.title}</h2>
+              <p className="mt-3 text-sm text-stone-300">{item.description}</p>
+            </article>
+          );
+        })}
       </section>
 
-      {/* Membership & Why Join */}
-      <section className="p-0 w-full md:w-4/5 mx-auto mt-1  py-12 space-y-20">
-        {/* Membership Section */}
-        <div className="bg-gray-50 rounded-2xl p-10 space-y-6 shadow-md">
-            <H3 className="text-center" text="Free & Paid Memberships" />
-         
-          <p className="text-gray-600 text-center max-w-2xl mx-auto">
-            Free Members stay in the loop with updates and discussions. Paid
-            Members unlock extras: exclusive tracks, behind-the-scenes, polls,
-            and giveaways.
+      <section className="mx-auto grid w-full max-w-7xl gap-6 px-6 pb-16 lg:grid-cols-2">
+        <article className="rounded-[1.75rem] border border-stone-800 bg-stone-900 p-7">
+          <h3 className="text-2xl font-semibold">Free and Paid Memberships</h3>
+          <p className="mt-3 text-sm text-stone-300">
+            Free members stay connected with updates and conversation. Paid members unlock premium
+            releases, deeper artist content, and priority access experiences.
           </p>
-
-          <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            <div className="bg-white rounded-xl shadow-md p-6 text-center">
-              <h3 className="font-bold text-xl mb-2 text-gray-900">Free</h3>
-              <p className="text-gray-600">
-                Stay updated with sneak peeks & discussions.
-              </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-stone-700 bg-stone-950 p-4">
+              <p className="text-sm font-semibold text-stone-100">Free</p>
+              <p className="mt-2 text-sm text-stone-400">Community updates, selected discussions, and previews.</p>
             </div>
-            <div className="bg-dark text-white rounded-xl shadow-md p-6 text-center">
-              <h3 className="font-bold text-xl mb-2">Paid</h3>
-              <p>
-                Unlock exclusive tracks, behind-the-scenes, polls & giveaways.
-              </p>
+            <div className="rounded-xl border border-[#F839A9]/40 bg-[#F839A9]/10 p-4">
+              <p className="text-sm font-semibold text-white">Paid</p>
+              <p className="mt-2 text-sm text-stone-200">Exclusive tracks, behind-the-scenes, and premium access.</p>
             </div>
           </div>
-        </div>
+        </article>
 
-        {/* Why Join */}
-        <div className="space-y-6 text-center">
-            <H2 className="text-center" text="Why Join?" />
-          
-          <p className="text-base sm:text-lg text-gray-600 max-w-3xl mx-auto">
-            Because music is more fun when you&apos;re part of it. In World. New.,
-            you&apos;re not just listening — you&apos;re shaping the journey.
+        <article className="rounded-[1.75rem] border border-stone-800 bg-stone-900 p-7">
+          <h3 className="text-2xl font-semibold">Why Join?</h3>
+          <p className="mt-3 text-sm text-stone-300">
+            Because music is better when you are part of the story. World. New. gives fans
+            a place to participate, not just observe.
           </p>
-          <p className="text-xl font-semibold text-blue-600">
-            ✨ Welcome to World. New. — where music meets community.
+          <p className="mt-5 rounded-xl border border-stone-700 bg-stone-950 p-4 text-sm text-stone-200">
+            Welcome to World. New. where music meets community.
           </p>
-        </div>
-
-        {/* Newsletter CTA */}
-        <div className="bg-gradient-to-r from-gray-900 via-gray-700 to-gray-500 text-black rounded-2xl p-10 sm:p-14 text-center shadow-md">
-            <H2 className="text-white mb-6" text="Stay Inspired. Join Our Newsletter" />
-          
-          <p className="mb-6 text-base sm:text-lg text-gray-50 max-w-xl mx-auto">
-            Be the first to discover exclusive content, giveaways, and updates.
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="px-4 py-3 rounded-lg border-2 border-gray-600 text-gray-900 w-full sm:w-72"
-            />
-            <button className="bg-black text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800">
-              Subscribe
-            </button>
+          <div className="mt-5">
+            <Link
+              href="/register"
+              className="inline-flex rounded-full bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white hover:bg-[#F839A9]"
+            >
+              Join The Community
+            </Link>
           </div>
-        </div>
+        </article>
       </section>
-    </div>
+    </main>
   );
 }

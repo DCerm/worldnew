@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { grotesk } from './ui/fonts';
+import { grotesk } from "./ui/fonts";
 import "./globals.css";
-import Script from 'next/script';
+import Script from "next/script";
 import ToastBridge from "./ui/toast-bridge";
+import ActionFeedback from "./ui/action-feedback";
 
 
 export const metadata: Metadata = {
@@ -19,30 +20,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
-    <html lang="en">
-        <head>
-            <meta name="theme-color" content="#333" />
-        
-        </head>
-       
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="theme-color" content="#333" />
+      </head>
       <body
-        className={` ${grotesk.className} text-black antialiased`}
+        className={`${grotesk.variable} ${grotesk.className} text-black antialiased`}
       >
+        <ActionFeedback />
         <ToastBridge />
         {children}
-      </body>
-      <Script src="https://www.googletagmanager.com/gtag/js?id=G-9675N3CMWM" />
-      <Script id="gtag" strategy="lazyOnload">
-            {`
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-9675N3CMWM" />
+        <Script id="gtag" strategy="lazyOnload">
+          {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-9675N3CMWM');
-            `}
-      </Script>
-
+          `}
+        </Script>
+      </body>
     </html>
-    </>
   );
 }

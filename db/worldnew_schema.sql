@@ -155,6 +155,15 @@ CREATE TABLE app_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE password_reset_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE app_settings (
   setting_key TEXT PRIMARY KEY,
   setting_value TEXT,
@@ -184,7 +193,7 @@ CREATE TABLE membership_plans (
   name TEXT NOT NULL,
   description TEXT,
   price_amount NUMERIC(10, 2) NOT NULL,
-  currency_code CHAR(3) NOT NULL DEFAULT 'USD',
+  currency_code CHAR(3) NOT NULL DEFAULT 'GBP',
   duration_days INTEGER NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order INTEGER NOT NULL DEFAULT 0,
@@ -208,7 +217,7 @@ CREATE TABLE user_subscriptions (
   external_order_id TEXT,
   external_subscription_id TEXT,
   purchase_amount NUMERIC(10, 2),
-  currency_code CHAR(3) DEFAULT 'USD',
+  currency_code CHAR(3) DEFAULT 'GBP',
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -244,7 +253,7 @@ CREATE TABLE media_items (
   file_size_bytes BIGINT,
   published_at TIMESTAMPTZ,
   tags JSONB NOT NULL DEFAULT '[]'::jsonb,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata) = 'object'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -329,6 +338,7 @@ CREATE TABLE groups (
   slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   visibility group_visibility NOT NULL DEFAULT 'public',
   owner_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   cover_image_url TEXT,
@@ -347,6 +357,41 @@ CREATE TABLE group_members (
   role TEXT NOT NULL DEFAULT 'member',
   joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (group_id, user_id)
+);
+
+CREATE TABLE community_topics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (group_id, slug)
+);
+
+CREATE TABLE community_threads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  topic_id UUID NOT NULL REFERENCES community_topics(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE community_thread_replies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id UUID NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  parent_reply_id UUID REFERENCES community_thread_replies(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE conversations (
@@ -420,6 +465,9 @@ CREATE INDEX idx_follows_following_id ON follows(following_id);
 CREATE INDEX idx_friendships_requester_id ON friendships(requester_id);
 CREATE INDEX idx_friendships_addressee_id ON friendships(addressee_id);
 CREATE INDEX idx_group_members_user_id ON group_members(user_id);
+CREATE INDEX idx_community_topics_group_id ON community_topics(group_id);
+CREATE INDEX idx_community_threads_topic_id ON community_threads(topic_id);
+CREATE INDEX idx_community_thread_replies_thread_id ON community_thread_replies(thread_id);
 CREATE INDEX idx_conversation_members_user_id ON conversation_members(user_id);
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);

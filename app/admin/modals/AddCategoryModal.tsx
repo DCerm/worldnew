@@ -25,7 +25,7 @@ export default function AddCategoryModal({ onCloseAction, onAddedAction }: AddCa
       <div className="bg-neutral-900 rounded-lg p-6 w-[350px] border border-gray-700 text-white shadow-lg">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <FiPlus className="text-blue-500" />
+            <FiPlus className="text-[#F839A9]" />
             Add New Category
           </h2>
           <button onClick={onCloseAction} className="text-gray-400 hover:text-white">
@@ -40,7 +40,7 @@ export default function AddCategoryModal({ onCloseAction, onAddedAction }: AddCa
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="bg-black border border-gray-700 w-full p-2 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="bg-black border border-gray-700 w-full p-2 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#F839A9]"
               required
             />
           </div>
@@ -56,7 +56,7 @@ export default function AddCategoryModal({ onCloseAction, onAddedAction }: AddCa
             </button>
             <button
               type="submit"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-[#F839A9] hover:bg-[#F839A9] rounded text-sm"
             >
               <FiSave />
               Save

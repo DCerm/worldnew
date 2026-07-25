@@ -1,177 +1,78 @@
-import Link from 'next/link';
+import Link from "next/link";
 
-export default function TermsAndConditions() {
+const sections = [
+  {
+    title: "1. Membership Access",
+    body: "Free and paid memberships unlock different levels of access. Memberships are personal accounts and may not be transferred or shared.",
+  },
+  {
+    title: "2. Payments and Renewals",
+    body: "Paid memberships are billed according to selected plans and may renew automatically unless canceled before the next billing cycle.",
+  },
+  {
+    title: "3. Community Conduct",
+    body: "Members must avoid harassment, hate speech, spam, illegal activity, and content that violates rights or community standards.",
+  },
+  {
+    title: "4. Content and Intellectual Property",
+    body: "You retain ownership of content you submit, while granting a license for in-platform display. Platform music, visuals, and brand assets remain World. New. intellectual property.",
+  },
+  {
+    title: "5. Suspension and Termination",
+    body: "We may suspend or terminate accounts for policy violations, abuse, fraudulent activity, or behavior that threatens community safety.",
+  },
+  {
+    title: "6. Service Availability",
+    body: "Services are provided as-is. We may update, pause, or discontinue features and do not guarantee uninterrupted operation.",
+  },
+  {
+    title: "7. Limitation of Liability",
+    body: "To the fullest extent allowed by law, World. New. is not liable for indirect, incidental, or consequential damages related to platform use.",
+  },
+  {
+    title: "8. Updates to Terms",
+    body: "Terms may be revised over time. Continued use of the platform after changes means you accept the updated terms.",
+  },
+];
+
+export default function TermsAndConditionsPage() {
   return (
-    <>
-      {/* TERMS & CONDITIONS */}
-      <section className="px-5 lg:px-20p py-24 lg:py-100 rounded-xl">
-        {/* Title */}
-        <h1 className="text-25px lg:text-2xl font-bold mb-2">Terms & Conditions</h1>
-        <p className="text-sm text-gray-600 mb-6">Last updated: [Insert Date]</p>
-
-        {/* Intro */}
-        <p className="mb-6">
-            Welcome to <span className="font-bold">World. New.</span> – an online
-            community owned and operated by Franke. These Terms &amp; Conditions
-            (“Terms”) set out the rules for using our website, community features,
-            and membership services. By joining World. New., whether on a free or
-            paid plan, you agree to these Terms.
-        </p>
-
-        {/* Sections */}
-        <div className="space-y-8 text-gray-800 leading-relaxed">
-            {/* Membership */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">1. Membership</h2>
-            <ul className="list-disc list-inside space-y-1">
-                <li>
-                <span className="font-bold">Free Membership:</span> Gives you
-                access to selected community areas, updates, and content.
-                </li>
-                <li>
-                <span className="font-bold">Paid Membership:</span> Unlocks
-                additional benefits such as exclusive content, early access to
-                music, special events, and other perks listed on the membership
-                page.
-                </li>
-            </ul>
-            <p className="mt-2">
-                Memberships are personal to you and cannot be transferred or shared.
-            </p>
-            </div>
-
-            {/* Payments */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">2. Payments & Renewals</h2>
-            <ul className="list-disc list-inside space-y-1">
-                <li>
-                Paid memberships are billed according to the plan you choose
-                (monthly, yearly, or otherwise stated).
-                </li>
-                <li>All payments are non-refundable except where required by law.</li>
-                <li>
-                Memberships automatically renew unless you cancel before your next
-                billing date.
-                </li>
-            </ul>
-            </div>
-
-            {/* Community Rules */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">3. Community Rules</h2>
-            <p>
-                World. New. is built on respect and positivity. To keep it safe and
-                enjoyable for everyone:
-            </p>
-            <ul className="list-disc list-inside space-y-1 mt-2">
-                <li>No harassment, hate speech, spam, or illegal content.</li>
-                <li>Respect the privacy of other members.</li>
-                <li>Don’t upload or share anything you don’t have the rights to.</li>
-                <li>
-                The team may remove posts, comments, or accounts that break these
-                rules.
-                </li>
-            </ul>
-            </div>
-
-            {/* Content & IP */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">
-                4. Content & Intellectual Property
-            </h2>
-            <ul className="list-disc list-inside space-y-1">
-                <li>
-                <span className="font-bold">Your Content:</span> You own the
-                rights to anything you post, but by posting you grant World. New.
-                a non-exclusive license to display and share it within the
-                community.
-                </li>
-                <li>
-                <span className="font-bold">World. New. Content:</span> All music,
-                videos, artwork, and community materials provided by Franke or the
-                team remain our intellectual property. You may enjoy them for
-                personal use but cannot copy, sell, or distribute them without
-                permission.
-                </li>
-            </ul>
-            </div>
-
-            {/* Termination */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">5. Termination</h2>
-            <p>We may suspend or terminate your membership if you:</p>
-            <ul className="list-disc list-inside space-y-1 mt-2">
-                <li>Break these Terms,</li>
-                <li>Misuse the platform, or</li>
-                <li>Engage in harmful behavior towards the community.</li>
-            </ul>
-            <p className="mt-2">
-                You may cancel your membership at any time through your account
-                settings.
-            </p>
-            </div>
-
-            {/* Disclaimers */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">6. Disclaimers</h2>
-            <ul className="list-disc list-inside space-y-1">
-                <li>
-                World. New. is provided “as is.” We do not guarantee uninterrupted
-                service or error-free content.
-                </li>
-                <li>
-                While we aim to create a safe community, we are not responsible
-                for user-generated content.
-                </li>
-            </ul>
-            </div>
-
-            {/* Liability */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">7. Limitation of Liability</h2>
-            <p>
-                To the maximum extent allowed by law, World. New. and its owners are
-                not liable for any damages arising from your use of the community,
-                including loss of data, revenue, or goodwill.
-            </p>
-            </div>
-
-            {/* Privacy */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">8. Privacy</h2>
-            <p>
-                Your information will be handled according to our{" "}
-                <Link href="/privacy-policy" className="text-blue-600 underline">
-                Privacy Policy
-                </Link>
-                . Please review it to understand how we collect, use, and protect
-                your data.
-            </p>
-            </div>
-
-            {/* Changes */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">9. Changes to These Terms</h2>
-            <p>
-                We may update these Terms from time to time. If changes are
-                significant, we’ll notify members by email or through the website.
-                Continued use of World. New. after changes means you accept the
-                updated Terms.
-            </p>
-            </div>
-
-            {/* Contact */}
-            <div>
-            <h2 className="font-bold text-xl mb-2">10. Contact</h2>
-            <p>
-                For questions about these Terms, contact us at:{" "}
-                <span className="font-bold">[Insert Contact Email]</span>
-            </p>
-            </div>
+    <main className="min-h-screen bg-stone-950 text-white">
+      <section className="mx-auto w-full max-w-7xl px-6 py-14">
+        <div className="rounded-[2rem] border border-stone-800 bg-gradient-to-r from-[#F839A9]/20 via-stone-900 to-stone-950 p-8 shadow-2xl lg:p-12">
+          <p className="text-xs uppercase tracking-[0.35em] text-[#80c8ff]">Terms and Conditions</p>
+          <h1 className="mt-4 text-4xl font-semibold lg:text-5xl">Simple rules for a healthy community.</h1>
+          <p className="mt-4 text-sm text-stone-300">Last updated: September 14, 2025</p>
+          <p className="mt-5 max-w-3xl text-base text-stone-300 lg:text-lg">
+            By using World. New., you agree to these terms. They help protect the community, the artist ecosystem, and member experience.
+          </p>
         </div>
-        </section>
+      </section>
 
-      {/* FOOTER */}
-    </>
+      <section className="mx-auto grid w-full max-w-7xl gap-5 px-6 pb-16 md:grid-cols-2">
+        {sections.map((section) => (
+          <article
+            key={section.title}
+            className="rounded-[1.5rem] border border-stone-800 bg-stone-900/80 p-6 shadow-sm"
+          >
+            <h2 className="text-xl font-semibold">{section.title}</h2>
+            <p className="mt-3 text-sm leading-relaxed text-stone-300">{section.body}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-6 pb-16">
+        <article className="rounded-[1.5rem] border border-stone-800 bg-stone-900 p-6">
+          <h3 className="text-xl font-semibold">Related Policies</h3>
+          <p className="mt-3 text-sm text-stone-300">
+            Please review our{" "}
+            <Link href="/privacy-policy" className="text-[#F839A9] underline">
+              Privacy Policy
+            </Link>
+            {" "}for details on data handling and user rights.
+          </p>
+        </article>
+      </section>
+    </main>
   );
 }
