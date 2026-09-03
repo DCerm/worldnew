@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
   createCommunityGroupAction,
   createCommunityTopicAction,
+  updateCommunityGroupAction,
   updateCommunityGroupSortOrderAction,
   updateCommunityTopicSortOrderAction,
   updateGlobalCoverAction,
@@ -172,6 +173,12 @@ export default async function AdminPage({
                   </p>
                   <form action={updateGlobalCoverAction} className="mt-4 space-y-3">
                     <input
+                      name="globalCoverImageFile"
+                      type="file"
+                      accept="image/*"
+                      className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-stone-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                    />
+                    <input
                       name="globalCoverImageUrl"
                       defaultValue={globalCoverUrl ?? ""}
                       placeholder="Global cover image URL"
@@ -317,6 +324,41 @@ export default async function AdminPage({
                     >
                       Open group
                     </Link>
+                    <form action={updateCommunityGroupAction} className="mt-4 grid gap-3 rounded-2xl border border-[#ffd1e9] bg-[#fff8fc] p-4 md:grid-cols-2">
+                      <input type="hidden" name="groupId" value={group.id} />
+                      <input
+                        name="name"
+                        defaultValue={group.name}
+                        placeholder="Group name"
+                        className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
+                      />
+                      <input
+                        name="sortOrder"
+                        defaultValue={group.sortOrder}
+                        placeholder="Display order"
+                        inputMode="numeric"
+                        className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400"
+                      />
+                      <textarea
+                        name="description"
+                        defaultValue={group.description ?? ""}
+                        placeholder="Description"
+                        rows={3}
+                        className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-gray-600 placeholder:text-gray-400 md:col-span-2"
+                      />
+                      <select
+                        name="visibility"
+                        defaultValue={group.visibility}
+                        className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-gray-600"
+                      >
+                        <option value="public">Public</option>
+                        <option value="private">Private</option>
+                        <option value="secret">Secret</option>
+                      </select>
+                      <button className="rounded-full bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white md:justify-self-start">
+                        Save group details
+                      </button>
+                    </form>
                   </article>
                 ))}
               </div>

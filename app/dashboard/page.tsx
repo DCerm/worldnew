@@ -1,19 +1,35 @@
-import React from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import {
+  RiArrowRightLine,
+  RiChat3Line,
+  RiMusic2Line,
+  RiTeamLine,
+} from "react-icons/ri";
 
 import { requireUser } from "@/lib/auth";
 import {
   DEFAULT_PROFILE_COVER_URL,
-  getCommunityGroups,
   getCommunityFeed,
+  getCommunityGroups,
   getGlobalProfileCoverUrl,
-  getMediaLibrary,
 } from "@/lib/data";
-import Image from "next/image";
-import { resolveAvatarUrl } from "@/lib/avatar";
-import { normalizeOptionalUrl } from "@/lib/avatar";
+import { normalizeOptionalUrl, resolveAvatarUrl } from "@/lib/avatar";
 
 type DashboardTab = "home" | "community";
+
+function formatActivityTime(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return "Recently";
+  }
+
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+  return `${Math.floor(minutes / 1440)}d ago`;
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -21,21 +37,20 @@ export default async function DashboardPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const user = await requireUser();
-  const resolvedSearchParams = await searchParams;
+  if (user.roles.includes("artist_admin") || user.roles.includes("super_admin")) {
+    redirect("/admin");
+  }
 
+  const resolvedSearchParams = await searchParams;
   const activeTab = (["home", "community"].includes(resolvedSearchParams.tab ?? "")
     ? resolvedSearchParams.tab
     : "home") as DashboardTab;
 
-  const [feed, media, globalCoverUrl, groups] = await Promise.all([
+  const [feed, groups, globalCoverUrl] = await Promise.all([
     getCommunityFeed(),
-    activeTab === "home" ? getMediaLibrary({ limit: 12 }) : Promise.resolve([]),
+    getCommunityGroups(),
     getGlobalProfileCoverUrl(),
-    activeTab === "community" ? getCommunityGroups() : Promise.resolve([]),
   ]);
-
-  const latestMedia = media.slice(0, 4);
-  const latestEvents = feed.slice(0, 5);
   const profileCoverUrl =
     normalizeOptionalUrl(globalCoverUrl) ??
     normalizeOptionalUrl(user.coverImageUrl) ??
@@ -47,174 +62,110 @@ export default async function DashboardPage({
   });
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-2 py-8 lg:px-8">
-      <div className="pb-4 lg:pb-8 overflow-hidden rounded-[2rem] border border-stone-200 bg-gradient-to-b from-white to-stone-50/60 shadow-[0_28px_60px_-40px_rgba(0,0,0,0.45)]">
-        <div className="relative overflow-hidden rounded-[1.5rem] border border-stone-200/80 shadow-sm">
-          <Image
-            src={profileCoverUrl}
-            alt="cover"
-            width={1600}
-            height={640}
-            className="h-60 w-full object-cover"
-          />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-          <div className="absolute left-4 top-4 rounded-full border border-white/35 bg-black/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur">
-            Artist Cover
+    <main className="wn-dashboard-page min-h-screen bg-white px-4 py-8 text-stone-950 lg:px-8">
+      <div className="mx-auto w-full max-w-[1320px]">
+        <section className="overflow-hidden rounded-[2rem] border border-stone-100 bg-white shadow-[0_26px_70px_-52px_rgba(15,23,42,.65)]">
+          <div className="relative min-h-44 overflow-hidden bg-[#F839A9]">
+            <img
+              src={profileCoverUrl}
+              alt="World New artist cover"
+              className="h-48 w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+            <span className="absolute left-5 top-5 rounded-full bg-white/25 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-white backdrop-blur">
+              Global cover
+            </span>
           </div>
-        </div>
-
-        <div className="lg:mx-2 relative lg:mt-4 flex flex-col items-center justify-between gap-4 rounded-2xl lg:border border-stone-200/80 bg-white/90 p-4 backdrop-blur lg:flex-row">
-          <div className="flex w-full items-center gap-4 ">
-            <div className="relative h-28 w-28 overflow-hidden rounded-full ring-4 ring-white shadow-lg">
-              <Image
+          <div className="flex flex-col gap-5 px-5 py-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <img
                 src={profileAvatarUrl}
-                alt="profile"
-                width={112}
-                height={112}
-                className="h-28 w-28 rounded-full object-cover"
+                alt={user.displayName || "World New member"}
+                className="h-20 w-20 rounded-full object-cover ring-4 ring-white"
               />
-            </div>
-            <div className="text-left">
-              <h2 className="text-2xl font-bold text-stone-900">{user.displayName}</h2>
-              <p className="max-w-xl text-md text-stone-600">{user.bio ?? "Music and light for the world"}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-2 lg:gap-3">
-              <div className="rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700">
-                Membership: {user.activePlanCode ?? "Community access"}
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-[#F839A9]">Community Dashboard</p>
+                <h1 className="mt-1 truncate text-2xl font-black">World New Community</h1>
+                <p className="mt-1 text-sm font-semibold text-stone-500">Connect, listen, watch, and grow together.</p>
               </div>
-              <Link
-                href="/#memberships"
-                prefetch={false}
-                className="rounded-lg bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#F839A9]"
-              >
-                Upgrade membership
-              </Link>
-            <Link
-              href="/gift-membership?returnTo=/dashboard"
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-stone-700"
-            >
-              Gift Membership
-            </Link>
-          </div>
-        </div>
-
-        <div className="mt-10 border-b border-stone-300 mx-2">
-          <nav className="flex justify-between">
-            <Link
-              href="/dashboard?tab=home"
-              className={`w-1/3 rounded-t-xl pb-3 pt-1 text-center text-md font-semibold transition ${
-                activeTab === "home"
-                  ? "border-b-2 border-[#F839A9] bg-[#F839A9]/10 text-[#F839A9]"
-                  : "text-stone-600 hover:border-b-2 hover:border-stone-400 hover:text-stone-900"
-              }`}
-            >
-              Home
-            </Link>
-            <Link
-              href="/media"
-              className="w-1/3 rounded-t-xl pb-3 pt-1 text-center text-md font-semibold text-stone-600 transition hover:border-b-2 hover:border-stone-400 hover:text-stone-900"
-            >
-              Music + Videos
-            </Link>
-            <Link
-              href="/dashboard?tab=community"
-              className={`w-1/3 rounded-t-xl pb-3 pt-1 text-center text-md font-semibold transition ${
-                activeTab === "community"
-                  ? "border-b-2 border-[#F839A9] bg-[#F839A9]/10 text-[#F839A9]"
-                  : "text-stone-600 hover:border-b-2 hover:border-stone-400 hover:text-stone-900"
-              }`}
-            >
-              Community
-            </Link>
-          </nav>
-        </div>
-
-        <div className="mx-2 lg:mx-8">
-
-        {activeTab === "home" && (
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-5">
-              <h3 className="text-xl font-bold text-stone-900">Latest events</h3>
-              {latestEvents.map((post) => (
-                <article key={post.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{post.authorName}</p>
-                    <p className="text-xs text-stone-500">{new Date(post.createdAt).toLocaleString()}</p>
-                  </div>
-                  <p className="mt-2 text-md text-stone-700">{post.body}</p>
-                </article>
-              ))}
             </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/community" className="rounded-full bg-stone-950 px-5 py-2.5 text-sm font-black text-white">View community page</Link>
+              <Link href="/dashboard/profile" className="rounded-full bg-[#F839A9] px-5 py-2.5 text-sm font-black text-white">Profile settings</Link>
+            </div>
+          </div>
+        </section>
 
-            <div className="space-y-5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-xl font-bold text-stone-900">Latest media</h3>
-                <Link
-                  href="/media/audio"
-                  className="rounded-full border border-[#F839A9]/40 px-3 py-1 text-xs font-semibold text-[#F839A9] transition hover:border-[#F839A9] hover:bg-[#F839A9]/10"
-                >
-                  View all audio files
-                </Link>
+        <nav className="mb-7 mt-5 grid grid-cols-3 border-b border-[#ffd1e9] text-sm font-black md:text-base">
+          <Link href="/dashboard?tab=home" className={`border-b-2 px-3 py-4 text-center ${activeTab === "home" ? "border-[#F839A9] bg-[#fff0f7] text-[#F839A9]" : "border-transparent text-stone-500 hover:text-stone-950"}`}>
+            Home
+          </Link>
+          <Link href="/media" className="border-b-2 border-transparent px-3 py-4 text-center text-stone-500 hover:text-stone-950">
+            Music + Videos
+          </Link>
+          <Link href="/dashboard?tab=community" className={`border-b-2 px-3 py-4 text-center ${activeTab === "community" ? "border-[#F839A9] bg-[#fff0f7] text-[#F839A9]" : "border-transparent text-stone-500 hover:text-stone-950"}`}>
+            Community
+          </Link>
+        </nav>
+
+        {activeTab === "home" ? (
+          <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_330px]">
+            <section className="min-w-0 space-y-5">
+              <div className="rounded-[2rem] bg-gradient-to-br from-[#F839A9] via-[#f75aa9] to-[#ffb6dc] p-7 text-white shadow-[0_26px_64px_-42px_rgba(248,57,169,.95)]">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-white/75">Your community home</p>
+                <h1 className="mt-3 text-3xl font-black md:text-4xl">Welcome back, {user.displayName || "member"}.</h1>
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-white/90">Catch up on new releases, artist announcements, and the conversations happening across your groups.</p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Link href="/media" className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-5 py-2.5 text-sm font-black text-white"><RiMusic2Line /> Explore media</Link>
+                  <Link href="/community" className="inline-flex items-center gap-2 rounded-full border border-white/60 px-5 py-2.5 text-sm font-black text-white"><RiTeamLine /> Open community</Link>
+                </div>
               </div>
-              {latestMedia.map((item) => (
-                <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                  <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{item.mediaType}</p>
-                  <h4 className="mt-1 text-lg font-semibold text-stone-900">{item.title}</h4>
-                  <p className="mt-2 text-md text-stone-600">{item.description ?? "New release"}</p>
-                  <Link href={`/media/watch/${item.id}`} className="mt-3 inline-flex rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold text-white">
-                    Play in fullscreen
-                  </Link>
-                </article>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {activeTab === "community" && (
-          <div className="mt-8 mx-auto space-y-6">
-            <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
-              <h3 className="text-2xl font-semibold text-stone-950">Community Groups</h3>
-              <p className="mt-2 text-md text-stone-500">
-                Explore groups, open a topic channel, then jump into threaded conversations.
-              </p>
-              <Link
-                href="/community"
-                className="mt-5 inline-flex rounded-full bg-[#F839A9] px-5 py-2 text-md font-semibold text-white"
-              >
-                Open all groups
-              </Link>
-            </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#F839A9]">Personal feed</p>
+                  <h2 className="mt-1 text-2xl font-black">What&apos;s happening</h2>
+                </div>
+                <Link href="/community" className="text-sm font-black text-[#F839A9]">View community <RiArrowRightLine className="inline" /></Link>
+              </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {groups.map((group) => (
-                <Link
-                  key={group.id}
-                  href={`/community/${group.slug}`}
-                  className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm transition hover:shadow-md"
-                >
-                  <p className="text-xs uppercase tracking-[0.2em] text-stone-500">{group.visibility}</p>
-                  <h4 className="mt-2 text-lg font-semibold text-stone-950">{group.name}</h4>
-                  <p className="mt-3 text-sm text-stone-700">
-                    {group.description || "Open this group to explore channels and threads."}
-                  </p>
-                  <div className="mt-4 flex gap-3 text-xs text-stone-500">
-                    <span>{group.topicCount} topics</span>
-                    <span>{group.memberCount} members</span>
+              {feed.length > 0 ? feed.map((post) => (
+                <article key={post.id} className="rounded-[1.5rem] border border-stone-100 bg-white p-5 shadow-[0_18px_48px_-38px_rgba(15,23,42,.65)]">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#fff0f7] font-black text-[#F839A9]">{post.authorName.slice(0, 1).toUpperCase()}</span>
+                      <div className="min-w-0"><strong className="block truncate text-sm font-black">{post.authorName}</strong><span className="text-xs text-stone-500">{formatActivityTime(post.createdAt)}</span></div>
+                    </div>
+                    {post.mediaTitle ? <span className="hidden rounded-full bg-stone-100 px-3 py-1 text-xs font-bold text-stone-600 sm:inline">{post.mediaTitle}</span> : null}
                   </div>
-                </Link>
-              ))}
-            </div>
+                  <p className="mt-4 whitespace-pre-line text-sm leading-6 text-stone-700">{post.body || "Shared an update with the community."}</p>
+                  <div className="mt-4 flex items-center gap-2 text-xs font-bold text-stone-500"><RiChat3Line className="text-[#F839A9]" /> {post.comments.length} {post.comments.length === 1 ? "reply" : "replies"}</div>
+                </article>
+              )) : (
+                <div className="rounded-[1.5rem] border border-dashed border-[#ffc5e4] bg-[#fff8fc] p-6 text-sm text-stone-600">Your feed is ready for the first community update.</div>
+              )}
+            </section>
 
-            {groups.length === 0 && (
-              <article className="rounded-[2rem] border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-600 shadow-sm">
-                No groups yet. An artist admin can create the first group from the Community page.
-              </article>
-            )}
+            <aside className="h-fit rounded-[1.5rem] border border-[#ffd1e9] bg-[#fff8fc] p-5 xl:sticky xl:top-28">
+              <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black">Quick links</h2><RiMusic2Line className="text-[#F839A9]" /></div>
+              <div className="mt-4 space-y-2">
+                <Link href="/media/audio" className="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm font-bold text-stone-800 transition hover:text-[#F839A9]">Albums and tracks <RiArrowRightLine /></Link>
+                <Link href="/community" className="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm font-bold text-stone-800 transition hover:text-[#F839A9]">Group chats <RiArrowRightLine /></Link>
+              </div>
+            </aside>
           </div>
+        ) : (
+          <section className="rounded-[1.75rem] border border-[#ffd1e9] bg-white p-5 shadow-[0_22px_54px_-42px_rgba(248,57,169,.8)] md:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#ffd1e9] pb-5">
+              <div><p className="text-xs font-black uppercase tracking-[0.24em] text-[#F839A9]">Community chat</p><h1 className="mt-2 text-3xl font-black">Find your conversations</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Open a group to join its existing topics and threaded discussions.</p></div>
+              <Link href="/community" className="inline-flex items-center gap-2 rounded-full bg-[#F839A9] px-5 py-3 text-sm font-black text-white">Open full community <RiArrowRightLine /></Link>
+            </div>
+            <div className="mt-5 divide-y divide-[#ffd1e9] rounded-2xl border border-[#ffd1e9]">
+              {groups.map((group) => <Link key={group.id} href={`/community/${group.slug}`} className="grid gap-3 p-4 transition hover:bg-[#fff8fc] md:grid-cols-[minmax(0,1fr)_100px_100px_auto] md:items-center"><div><h2 className="font-black text-stone-950">{group.name}</h2><p className="mt-1 text-sm text-stone-600">{group.description || "Open this group to explore its conversations."}</p></div><span className="text-xs font-bold text-stone-500">{group.memberCount} members</span><span className="text-xs font-bold text-stone-500">{group.topicCount} topics</span><RiArrowRightLine className="text-xl text-[#F839A9]" /></Link>)}
+              {groups.length === 0 ? <div className="p-6 text-sm text-stone-600">No groups are available yet.</div> : null}
+            </div>
+          </section>
         )}
-        </div>
       </div>
     </main>
   );

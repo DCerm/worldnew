@@ -213,6 +213,35 @@ async function saveUploadedPosterFile(
   return `/uploads/posters/${filename}`;
 }
 
+async function saveUploadedProfileImage(
+  ownerId: string,
+  kind: "avatar" | "cover",
+  file: FormDataEntryValue | null
+) {
+  if (!(file instanceof File) || file.size <= 0) {
+    return null;
+  }
+
+  const maxBytes = 20 * 1024 * 1024;
+  if (file.size > maxBytes || (file.type && !file.type.startsWith("image/"))) {
+    return null;
+  }
+
+  const uploadsDir = path.join(process.cwd(), "public", "uploads", "profiles");
+  await mkdir(uploadsDir, { recursive: true });
+
+  const extension = extensionFromImage(file);
+  const filename = `${ownerId}-${kind}-${Date.now()}.${extension}`;
+  const destination = path.join(uploadsDir, filename);
+  const inputStream = Readable.fromWeb(
+    file.stream() as unknown as NodeReadableStream<Uint8Array>
+  );
+  const outputStream = createWriteStream(destination);
+  await pipeline(inputStream, outputStream);
+
+  return `/uploads/profiles/${filename}`;
+}
+
 export async function registerAction(formData: FormData) {
   const sql = requireDatabase();
   const displayName = String(formData.get("displayName") ?? "").trim();
@@ -675,16 +704,16 @@ export async function updateProfileAction(formData: FormData) {
   const sql = requireDatabase();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
-  const avatarUrl = String(formData.get("avatarUrl") ?? "").trim();
-  const coverImageUrl = String(formData.get("coverImageUrl") ?? "").trim();
   const hasBio = formData.has("bio");
-  const hasAvatar = formData.has("avatarUrl");
-  const hasCover = formData.has("coverImageUrl");
+  const avatarUpload = await saveUploadedProfileImage(user.id, "avatar", formData.get("avatarFile"));
+  const coverUpload = await saveUploadedProfileImage(user.id, "cover", formData.get("coverImageFile"));
+  const clearAvatar = String(formData.get("clearAvatar") ?? "") === "on";
+  const clearCover = String(formData.get("clearCover") ?? "") === "on";
 
   const nextDisplayName = displayName || user.displayName;
   const nextBio = hasBio ? (bio || null) : user.bio;
-  const nextAvatarUrl = hasAvatar ? (avatarUrl || null) : user.avatarUrl;
-  const nextCoverImageUrl = hasCover ? (coverImageUrl || null) : user.coverImageUrl;
+  const nextAvatarUrl = avatarUpload ?? (clearAvatar ? null : user.avatarUrl);
+  const nextCoverImageUrl = coverUpload ?? (clearCover ? null : user.coverImageUrl);
 
   await sql`
     update users
@@ -708,7 +737,8 @@ export async function updateProfileAction(formData: FormData) {
 export async function updateGlobalCoverAction(formData: FormData) {
   const user = await requireAdmin();
   const sql = requireDatabase();
-  const coverImageUrl = String(formData.get("globalCoverImageUrl") ?? "").trim();
+  const uploadedCoverUrl = await saveUploadedProfileImage(user.id, "cover", formData.get("globalCoverImageFile"));
+  const coverImageUrl = uploadedCoverUrl ?? String(formData.get("globalCoverImageUrl") ?? "").trim();
 
   try {
     if (!coverImageUrl) {
@@ -757,6 +787,13 @@ function sanitizeMembershipPlanCode(value: string) {
     .trim()
     .replace(/[^a-z0-9_]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+async function ensureCommunityGroupSchema(sql: ReturnType<typeof requireDatabase>) {
+  await sql`
+    alter table groups
+    add column if not exists sort_order integer not null default 0
+  `;
 }
 
 function parseOptionalPositiveInt(value: string) {
@@ -1133,6 +1170,8 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
   await requireAdmin();
 
   const productId = parseOptionalPositiveInt(String(formData.get("productId") ?? ""));
+  const releaseKindInput = String(formData.get("releaseKind") ?? "track").trim();
+  const releaseKind = releaseKindInput === "album" ? "album" : "track";
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const artist = String(formData.get("artist") ?? "").trim();
@@ -1142,9 +1181,44 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
   const streamUrlInput = String(formData.get("streamUrl") ?? "").trim();
   const streamFile = formData.get("streamFile");
   const priceInput = String(formData.get("price") ?? "").trim();
+  const communityPriceInput = String(formData.get("communityPrice") ?? "").trim();
   const previewSecondsInput = String(formData.get("previewSeconds") ?? "").trim();
+  const previewStartSecondsInput = String(formData.get("previewStartSeconds") ?? "").trim();
+  const previewEndSecondsInput = String(formData.get("previewEndSeconds") ?? "").trim();
   const status = String(formData.get("status") ?? "publish").trim().toLowerCase();
   const isFeatured = String(formData.get("isFeatured") ?? "") === "on";
+  const showOnWebsite = String(formData.get("showOnWebsite") ?? "") === "on";
+  const showOnCommunity = String(formData.get("showOnCommunity") ?? "") === "on";
+  const albumPackageModeInput = String(formData.get("albumPackageMode") ?? "").trim();
+  const albumPackageMode = albumPackageModeInput === "existing_tracks" ? "existing_tracks" : "zip_package";
+  const albumPackageZipUrl = String(formData.get("albumPackageZipUrl") ?? "").trim();
+  const albumCommunityPriceRaw = String(formData.get("albumCommunityPrice") ?? "").trim();
+  const albumCommunityPriceInput = albumCommunityPriceRaw || communityPriceInput;
+  const albumMinimumOfferPriceInput = String(formData.get("albumMinimumOfferPrice") ?? "").trim();
+  const albumEnableOfferPrice = String(formData.get("albumEnableOfferPrice") ?? "") === "on";
+  const albumEnableDonation = String(formData.get("albumEnableDonation") ?? "") === "on";
+  const albumAllowIndividualTrackSales = String(formData.get("albumAllowIndividualTrackSales") ?? "") === "on";
+  const albumTrackSelectionSubmitted = String(formData.get("albumTrackSelectionEnabled") ?? "") === "yes";
+  const albumTrackProductIds = albumTrackSelectionSubmitted
+    ? Array.from(new Set(
+        formData
+          .getAll("albumTrackProductIds")
+          .map((value) => parseOptionalPositiveInt(String(value)))
+          .filter((value): value is number => value !== null)
+      )).sort((left, right) => {
+        const leftPosition = parseOptionalPositiveInt(String(formData.get(`albumTrackPosition_${left}`) ?? "")) ?? Number.MAX_SAFE_INTEGER;
+        const rightPosition = parseOptionalPositiveInt(String(formData.get(`albumTrackPosition_${right}`) ?? "")) ?? Number.MAX_SAFE_INTEGER;
+        return leftPosition - rightPosition || left - right;
+      })
+    : null;
+  const communityPlaybackModeInput = String(
+    formData.get("communityPlaybackMode") ?? "preview"
+  ).trim();
+  const communityPlaybackMode = ["preview", "full", "members_full"].includes(
+    communityPlaybackModeInput
+  )
+    ? (communityPlaybackModeInput as "preview" | "full" | "members_full")
+    : "preview";
 
   const uploadedStreamPath = await saveUploadedMediaFile(
     `wp-track-${productId ?? randomUUID()}`,
@@ -1158,14 +1232,24 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
     return;
   }
 
-  if (!streamUrl) {
-    await setToast("Preview stream URL is required.", "error");
-    return;
-  }
-
   const parsedPrice = parseOptionalPositiveNumber(priceInput);
   if (priceInput && parsedPrice === null) {
     await setToast("Please enter a valid non-negative price.", "error");
+    return;
+  }
+  const parsedCommunityPrice = parseOptionalPositiveNumber(communityPriceInput);
+  if (communityPriceInput && parsedCommunityPrice === null) {
+    await setToast("Please enter a valid non-negative community price.", "error");
+    return;
+  }
+  const parsedAlbumCommunityPrice = parseOptionalPositiveNumber(albumCommunityPriceInput);
+  if (albumCommunityPriceInput && parsedAlbumCommunityPrice === null) {
+    await setToast("Please enter a valid non-negative community album price.", "error");
+    return;
+  }
+  const parsedAlbumMinimumOfferPrice = parseOptionalPositiveNumber(albumMinimumOfferPriceInput);
+  if (albumMinimumOfferPriceInput && parsedAlbumMinimumOfferPrice === null) {
+    await setToast("Please enter a valid non-negative minimum offer price.", "error");
     return;
   }
 
@@ -1174,10 +1258,25 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
     await setToast("Preview seconds must be a whole number of at least 5.", "error");
     return;
   }
+  const previewStartSeconds = previewStartSecondsInput ? Number(previewStartSecondsInput) : 0;
+  const previewEndSeconds = previewEndSecondsInput ? Number(previewEndSecondsInput) : 0;
+  if (!Number.isInteger(previewStartSeconds) || previewStartSeconds < 0) {
+    await setToast("Preview start must be a whole number of 0 or more.", "error");
+    return;
+  }
+  if (!Number.isInteger(previewEndSeconds) || previewEndSeconds < 0) {
+    await setToast("Preview end must be a whole number of 0 or more.", "error");
+    return;
+  }
+  if (previewEndSeconds > 0 && previewEndSeconds <= previewStartSeconds) {
+    await setToast("Preview end must be after the preview start, or left blank.", "error");
+    return;
+  }
 
   try {
     await upsertWordPressMusicProduct({
       productId,
+      kind: releaseKind,
       title,
       description,
       artist,
@@ -1186,7 +1285,27 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
       coverImageUrl,
       streamUrl,
       price: parsedPrice !== null ? parsedPrice.toFixed(2) : "",
+      communityPrice: parsedCommunityPrice !== null ? parsedCommunityPrice.toFixed(2) : "",
       previewSeconds,
+      previewStartSeconds,
+      previewEndSeconds,
+      showOnWebsite,
+      showOnCommunity,
+      communityPlaybackMode,
+      albumShowOnCommunity: releaseKind === "album" ? showOnCommunity : false,
+      albumPackageMode: releaseKind === "album" ? albumPackageMode : null,
+      albumPackageZipUrl,
+      albumCommunityPrice:
+        parsedAlbumCommunityPrice !== null
+          ? parsedAlbumCommunityPrice.toFixed(2)
+          : parsedCommunityPrice !== null
+            ? parsedCommunityPrice.toFixed(2)
+            : "",
+      albumEnableOfferPrice,
+      albumMinimumOfferPrice: parsedAlbumMinimumOfferPrice !== null ? parsedAlbumMinimumOfferPrice.toFixed(2) : "",
+      albumEnableDonation,
+      albumAllowIndividualTrackSales,
+      albumTrackProductIds,
       isFeatured,
       status,
     });
@@ -1251,6 +1370,7 @@ export async function createCommentAction(formData: FormData) {
 export async function createCommunityGroupAction(formData: FormData) {
   const user = await requireAdmin();
   const sql = requireDatabase();
+  await ensureCommunityGroupSchema(sql);
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const sortOrderInput = String(formData.get("sortOrder") ?? "").trim();
@@ -1303,6 +1423,51 @@ export async function createCommunityGroupAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/admin");
   await setToast("Community group saved.");
+}
+
+export async function updateCommunityGroupAction(formData: FormData) {
+  const user = await requireAdmin();
+  const sql = requireDatabase();
+  await ensureCommunityGroupSchema(sql);
+  const groupId = String(formData.get("groupId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const sortOrderInput = String(formData.get("sortOrder") ?? "").trim();
+  const sortOrder = sortOrderInput ? Number(sortOrderInput) : 0;
+  const visibilityInput = String(formData.get("visibility") ?? "public").trim().toLowerCase();
+  const visibility = ["public", "private", "secret"].includes(visibilityInput)
+    ? visibilityInput
+    : "public";
+  const slug = slugify(name);
+
+  if (!groupId || !name || !slug || !Number.isInteger(sortOrder)) {
+    await setToast("Group name and display order are required.", "error");
+    return;
+  }
+
+  try {
+    await sql`
+      update groups
+      set
+        slug = ${slug},
+        name = ${name},
+        description = ${description || null},
+        sort_order = ${sortOrder},
+        visibility = ${visibility}::group_visibility,
+        owner_id = coalesce(owner_id, ${user.id}),
+        updated_at = now()
+      where id = ${groupId}
+    `;
+  } catch (error) {
+    console.error("updateCommunityGroupAction failed", error);
+    await setToast("Could not update community group.", "error");
+    return;
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/community");
+  revalidatePath("/dashboard");
+  await setToast("Community group updated.");
 }
 
 export async function createCommunityTopicAction(formData: FormData) {
@@ -1370,6 +1535,7 @@ export async function createCommunityTopicAction(formData: FormData) {
 export async function updateCommunityGroupSortOrderAction(formData: FormData) {
   await requireAdmin();
   const sql = requireDatabase();
+  await ensureCommunityGroupSchema(sql);
   const groupId = String(formData.get("groupId") ?? "").trim();
   const sortOrderInput = String(formData.get("sortOrder") ?? "").trim();
   const sortOrder = Number(sortOrderInput);
@@ -1543,9 +1709,7 @@ export async function createMediaAction(formData: FormData): Promise<ActionOutco
   const sql = requireDatabase();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const mediaType = String(formData.get("mediaType") ?? "audio") as
-    | "audio"
-    | "video";
+  const mediaType = "video";
   const visibility = String(formData.get("visibility") ?? "community");
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   const playbackUrlInput = String(formData.get("playbackUrl") ?? "").trim();
@@ -1696,9 +1860,7 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
   const mediaId = String(formData.get("mediaId") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const mediaType = String(formData.get("mediaType") ?? "audio") as
-    | "audio"
-    | "video";
+  const mediaType = "video";
   const visibility = String(formData.get("visibility") ?? "community");
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   const playbackUrlInput = String(formData.get("playbackUrl") ?? "").trim();

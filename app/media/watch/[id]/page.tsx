@@ -18,6 +18,25 @@ export default async function WatchMediaPage({
   }
 
   const canPlay = canAccessMedia(user, media);
+  const shouldLimitToPreview =
+    media.communityPlaybackMode === "preview" ||
+    (media.communityPlaybackMode === "members_full" && !user?.activePlanCode);
+  const playableSource = shouldLimitToPreview
+    ? media.playbackUrl
+    : media.fullPlaybackUrl ?? media.playbackUrl;
+  const lockedState = !canPlay
+    ? user
+      ? {
+          message: "Upgrade your membership to access this media.",
+          href: "/#memberships",
+          label: "View membership plans",
+        }
+      : {
+          message: "You must be signed in to stream this content.",
+          href: "/login",
+          label: "Sign in",
+        }
+    : null;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -29,24 +48,33 @@ export default async function WatchMediaPage({
       </div>
 
       <section className="flex h-[calc(100vh-64px)] w-full items-center justify-center">
-        {!canPlay ? (
-          <div className="rounded-2xl border border-white/20 bg-black px-6 py-8 text-center text-stone-300">
-            This media is locked for your current membership.
+        {lockedState ? (
+          <div className="space-y-5 rounded-2xl border border-white/20 bg-black px-6 py-8 text-center text-stone-300">
+            <p>{lockedState.message}</p>
+            <Link href={lockedState.href} className="inline-flex rounded-full bg-[#F839A9] px-5 py-2 text-sm font-black text-white">
+              {lockedState.label}
+            </Link>
           </div>
-        ) : media.fullPlaybackUrl ?? media.playbackUrl ? (
+        ) : playableSource ? (
           media.mediaType === "video" ? (
             <SleekVideoPlayer
-              src={media.fullPlaybackUrl ?? media.playbackUrl!}
+              src={playableSource}
               poster={media.posterImageUrl ?? undefined}
               autoPlay
+              previewLimitSeconds={shouldLimitToPreview ? media.previewSeconds : undefined}
+              previewStartSeconds={shouldLimitToPreview ? media.previewStartSeconds ?? 0 : undefined}
+              previewEndSeconds={shouldLimitToPreview ? media.previewEndSeconds ?? undefined : undefined}
               className="h-full w-full object-contain"
             />
           ) : (
             <div className="w-full max-w-3xl px-6">
               <SleekAudioPlayer
                 className="w-full"
-                src={media.fullPlaybackUrl ?? media.playbackUrl!}
+                src={playableSource}
                 autoPlay
+                previewLimitSeconds={shouldLimitToPreview ? media.previewSeconds : undefined}
+                previewStartSeconds={shouldLimitToPreview ? media.previewStartSeconds ?? 0 : undefined}
+                previewEndSeconds={shouldLimitToPreview ? media.previewEndSeconds ?? undefined : undefined}
               />
             </div>
           )

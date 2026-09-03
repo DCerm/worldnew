@@ -123,10 +123,6 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
     () => mediaItems.filter((item) => item.mediaType === "video"),
     [mediaItems]
   );
-  const audios = useMemo(
-    () => mediaItems.filter((item) => item.mediaType === "audio"),
-    [mediaItems]
-  );
 
   const editingItem = useMemo(
     () => mediaItems.find((item) => item.id === editingId) ?? null,
@@ -153,7 +149,7 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
   }
 
   function getOverallUploadProgress(
-    files: { file: File; kind: "playback" | "poster"; mediaType: "audio" | "video" }[],
+    files: { file: File; kind: "playback" | "poster"; mediaType: "video" }[],
     currentIndex: number,
     currentLoaded: number
   ) {
@@ -177,7 +173,7 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
     file: File,
     options: {
       kind: "playback" | "poster";
-      mediaType: "audio" | "video";
+      mediaType: "video";
       uploadId: string;
       onProgress: (loadedBytes: number) => void;
     }
@@ -229,10 +225,10 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
     setUploadState: (state: UploadProgressState) => void,
     uploadId: string
   ) {
-    const mediaType = String(formData.get("mediaType") ?? "video") === "audio" ? "audio" : "video";
+    const mediaType = "video";
     const mediaFile = formData.get("mediaFile");
     const posterFile = formData.get("posterFile");
-    const files: { file: File; kind: "playback" | "poster"; mediaType: "audio" | "video" }[] = [];
+    const files: { file: File; kind: "playback" | "poster"; mediaType: "video" }[] = [];
 
     if (mediaFile instanceof File && mediaFile.size > 0) {
       files.push({ file: mediaFile, kind: "playback", mediaType });
@@ -532,7 +528,7 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
           <div>
             <h1 className="text-3xl font-semibold text-stone-950">Media Publishing</h1>
             <p className="mt-2 text-sm text-stone-500">
-              Add audio or video entries and define who can unlock them.
+              Add video entries and define who can unlock them. Audio tracks and albums now live in Music Store.
             </p>
           </div>
           <button
@@ -545,24 +541,14 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr] lg:py-12 lg:px-0">
+      <section className="lg:py-12 lg:px-0">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-600">Videos</h2>
             <span className="text-xs uppercase tracking-[0.2em] text-stone-500">{videos.length} total</span>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {videos.map(renderMediaCard)}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-600">Audio</h2>
-            <span className="text-xs uppercase tracking-[0.2em] text-stone-500">{audios.length} total</span>
-          </div>
-          <div className="space-y-4">
-            {audios.map(renderMediaCard)}
           </div>
         </div>
       </section>
@@ -592,6 +578,7 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
               encType="multipart/form-data"
               className="space-y-3"
             >
+              <input type="hidden" name="mediaType" value="video" />
               <UploadProgressPanel state={createUploadState} />
               
               <FieldShell
@@ -616,19 +603,6 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                 />
               </FieldShell>
               <div className="grid gap-2 md:grid-cols-2">
-                <FieldShell
-                  label="Media type"
-                  hint="Choose audio for music and spoken-word releases, or video for the Netflix-style experience."
-                >
-                  <select
-                    name="mediaType"
-                    defaultValue="video"
-                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-                  >
-                    <option value="video">Video</option>
-                    <option value="audio">Audio</option>
-                  </select>
-                </FieldShell>
                 <FieldShell
                   label="Category"
                   hint="Use categories to group releases together on the public media pages."
@@ -683,18 +657,18 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
               </div>
               <FieldShell
                 label="Upload media file"
-                hint="Best for files you want stored directly with the platform. Accepted: audio or video."
+                hint="Best for files you want stored directly with the platform. Accepted: video files."
               >
                 <input
                   name="mediaFile"
                   type="file"
-                  accept="audio/*,video/*"
+                  accept="video/*"
                   className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                 />
               </FieldShell>
               <FieldShell
                 label="Upload poster image"
-                hint="Optional cover image for cards, audio artwork, and video posters."
+                hint="Optional cover image for cards and video posters."
               >
                 <input
                   name="posterFile"
@@ -819,6 +793,7 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
               className="space-y-3"
             >
               <input type="hidden" name="mediaId" value={editingItem.id} />
+              <input type="hidden" name="mediaType" value="video" />
               <UploadProgressPanel state={editUploadState} />
               <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4 text-sm text-stone-600">
                 Update the playback source, poster, visibility, or preview settings here. Uploading a new file replaces the existing media asset for this item.
@@ -841,16 +816,6 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                 />
               </FieldShell>
               <div className="grid gap-2 md:grid-cols-2">
-                <FieldShell label="Media type" hint="Switch between audio and video presentation.">
-                  <select
-                    name="mediaType"
-                    defaultValue={editingItem.mediaType}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-                  >
-                    <option value="video">Video</option>
-                    <option value="audio">Audio</option>
-                  </select>
-                </FieldShell>
                 <FieldShell label="Category" hint="Choose where this release should appear in grouped media shelves.">
                   <select
                     name="categoryId"
@@ -898,7 +863,7 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                 <input
                   name="mediaFile"
                   type="file"
-                  accept="audio/*,video/*"
+                  accept="video/*"
                   className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                 />
               </FieldShell>

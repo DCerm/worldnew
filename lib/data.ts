@@ -1,6 +1,10 @@
 import { withDb } from "@/lib/db";
 import type { AuthUser } from "@/lib/auth";
-import { getWordPressPlanPrices } from "@/lib/wordpress";
+import {
+  getWordPressMusicProductsForAdmin,
+  getWordPressPlanPrices,
+  type WordPressMusicProduct,
+} from "@/lib/wordpress";
 import {
   createSignedMediaStreamUrl,
   normalizePreviewSeconds,
@@ -43,8 +47,130 @@ export type MediaCard = {
   isFeatured: boolean;
   hiddenFromPublicPages: boolean;
   previewSeconds: number;
+  previewStartSeconds?: number | null;
+  previewEndSeconds?: number | null;
   fullPlaybackUrl: string | null;
+  communityPlaybackMode?: "preview" | "full" | "members_full";
+  sourceProductUrl?: string | null;
 };
+
+const WORDPRESS_VIDEO_CATEGORY_LABELS: Record<string, string> = {
+  movies: "Movies",
+  reels: "Reels",
+  mixtapes: "Mixtapes",
+  "behind-the-scenes": "Behind the Scenes",
+};
+
+function wordpressVideoProductToMediaCard(product: WordPressMusicProduct): MediaCard | null {
+  if (product.kind !== "video" || product.show_on_community === false || !product.stream_url) {
+    return null;
+  }
+
+  const categorySlug = product.community_category ?? "behind-the-scenes";
+  const playbackMode = product.community_playback_mode === "members_full" ? "members_full" : "full";
+
+  return {
+    id: `wp-video-${product.id}`,
+    title: product.title,
+    description: product.short_description || product.description || null,
+    mediaType: "video",
+    visibility: "community",
+    categoryName: WORDPRESS_VIDEO_CATEGORY_LABELS[categorySlug] ?? "Behind the Scenes",
+    categorySlug,
+    playbackUrl: product.stream_url,
+    rawPlaybackUrl: product.stream_url,
+    posterImageUrl: product.poster_image_url || product.cover_image_url || null,
+    createdAt: new Date().toISOString(),
+    planCodes: [],
+    tags: product.category_slugs ?? [],
+    featuredArtists: null,
+    isFeatured: Boolean(product.is_featured),
+    hiddenFromPublicPages: false,
+    previewSeconds: normalizePreviewSeconds(product.preview_seconds),
+    previewStartSeconds: product.preview_start_seconds ?? 0,
+    previewEndSeconds: product.preview_end_seconds ?? null,
+    fullPlaybackUrl: product.stream_url,
+    communityPlaybackMode: playbackMode,
+    sourceProductUrl: product.product_url,
+  };
+}
+
+function wordpressAudioProductToMediaCard(product: WordPressMusicProduct): MediaCard | null {
+  if (product.kind !== "track" || product.show_on_community === false || !product.stream_url) {
+    return null;
+  }
+
+  const playbackMode = product.community_playback_mode ?? "preview";
+
+  return {
+    id: `wp-audio-${product.id}`,
+    title: product.title,
+    description: product.short_description || product.description || null,
+    mediaType: "audio",
+    visibility: playbackMode === "members_full" ? "paid" : "community",
+    categoryName: "Music",
+    categorySlug: "music",
+    playbackUrl: product.stream_url,
+    rawPlaybackUrl: product.stream_url,
+    posterImageUrl: product.cover_image_url || null,
+    createdAt: product.published_at ?? new Date().toISOString(),
+    planCodes: [],
+    tags: product.category_slugs ?? [],
+    featuredArtists: product.artist || null,
+    isFeatured: Boolean(product.is_featured),
+    hiddenFromPublicPages: false,
+    previewSeconds: normalizePreviewSeconds(product.preview_seconds),
+    previewStartSeconds: product.preview_start_seconds ?? 0,
+    previewEndSeconds: product.preview_end_seconds ?? null,
+    fullPlaybackUrl: product.stream_url,
+    communityPlaybackMode: playbackMode,
+    sourceProductUrl: product.product_url,
+  };
+}
+
+async function getWordPressVideoMediaCards(): Promise<MediaCard[]> {
+  const products = await getWordPressMusicProductsForAdmin();
+
+  return products
+    .map(wordpressVideoProductToMediaCard)
+    .filter((item): item is MediaCard => Boolean(item));
+}
+
+async function getWordPressAudioMediaCards(): Promise<MediaCard[]> {
+  const products = await getWordPressMusicProductsForAdmin();
+
+  return products
+    .map(wordpressAudioProductToMediaCard)
+    .filter((item): item is MediaCard => Boolean(item));
+}
+
+export async function getWordPressVideoMediaItemById(mediaId: string): Promise<MediaCard | null> {
+  if (!mediaId.startsWith("wp-video-")) {
+    return null;
+  }
+
+  const productId = Number(mediaId.replace("wp-video-", ""));
+  if (!Number.isFinite(productId) || productId < 1) {
+    return null;
+  }
+
+  const media = await getWordPressVideoMediaCards();
+  return media.find((item) => item.id === mediaId) ?? null;
+}
+
+export async function getWordPressAudioMediaItemById(mediaId: string): Promise<MediaCard | null> {
+  if (!mediaId.startsWith("wp-audio-")) {
+    return null;
+  }
+
+  const productId = Number(mediaId.replace("wp-audio-", ""));
+  if (!Number.isFinite(productId) || productId < 1) {
+    return null;
+  }
+
+  const media = await getWordPressAudioMediaCards();
+  return media.find((item) => item.id === mediaId) ?? null;
+}
 
 export type FeedPost = {
   id: string;
@@ -97,6 +223,51 @@ export type CommunityTopicSummary = {
   sortOrder: number;
   threadCount: number;
 };
+
+async function ensureCommunityGroupDefaults(sql: Parameters<Parameters<typeof withDb>[0]>[0]) {
+  await sql`
+    alter table groups
+    add column if not exists sort_order integer not null default 0
+  `;
+
+  const countRows = await sql<{ count: number }[]>`
+    select count(*)::int as count
+    from groups
+  `;
+
+  if ((countRows[0]?.count ?? 0) > 0) {
+    return;
+  }
+
+  const ownerRows = await sql<{ id: string }[]>`
+    select u.id
+    from users u
+    left join user_roles ur on ur.user_id = u.id
+    left join roles r on r.id = ur.role_id
+    order by
+      case when r.code in ('super_admin', 'artist_admin') then 0 else 1 end,
+      u.created_at asc
+    limit 1
+  `;
+  const ownerId = ownerRows[0]?.id;
+
+  if (!ownerId) {
+    return;
+  }
+
+  await sql`
+    insert into groups (slug, name, description, sort_order, visibility, owner_id)
+    values (
+      'community-updates',
+      'Community Updates',
+      'Updates, questions, and direct conversations with the artist.',
+      0,
+      'public'::group_visibility,
+      ${ownerId}
+    )
+    on conflict (slug) do nothing
+  `;
+}
 
 export type CommunityThreadReply = {
   id: string;
@@ -306,7 +477,7 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
       : null;
   const includeHidden = Boolean(options.includeHidden);
 
-  return withDb(async (sql) => {
+  const localMedia = await withDb(async (sql) => {
     const rows = await sql<{
       id: string;
       title: string;
@@ -415,9 +586,30 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
         : null,
     }));
   }, []);
+
+  const [wordpressVideos, wordpressAudios] = await Promise.all([
+    getWordPressVideoMediaCards(),
+    getWordPressAudioMediaCards(),
+  ]);
+
+  return [
+    ...wordpressVideos,
+    ...wordpressAudios,
+    ...localMedia.filter((item) => item.mediaType === "video"),
+  ];
 }
 
 export async function getMediaItemById(mediaId: string): Promise<MediaCard | null> {
+  const wordpressVideo = await getWordPressVideoMediaItemById(mediaId);
+  if (wordpressVideo) {
+    return wordpressVideo;
+  }
+
+  const wordpressAudio = await getWordPressAudioMediaItemById(mediaId);
+  if (wordpressAudio) {
+    return wordpressAudio;
+  }
+
   return withDb(async (sql) => {
     const rows = await sql<{
       id: string;
@@ -632,6 +824,8 @@ export async function getCommunityFeed(): Promise<FeedPost[]> {
 
 export async function getCommunityGroups(): Promise<CommunityGroupSummary[]> {
   return withDb(async (sql) => {
+    await ensureCommunityGroupDefaults(sql);
+
     const rows = await sql<{
       id: string;
       slug: string;
@@ -676,6 +870,8 @@ export async function getCommunityTopicsByGroupSlug(groupSlug: string): Promise<
   topics: CommunityTopicSummary[];
 }> {
   return withDb(async (sql) => {
+    await ensureCommunityGroupDefaults(sql);
+
     const groupRows = await sql<{
       id: string;
       slug: string;

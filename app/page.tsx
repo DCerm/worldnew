@@ -45,7 +45,7 @@ export default async function HomePage() {
 
       <section className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-10 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl space-y-6">
-          <p className="text-sm uppercase tracking-[0.4em] text-[#F839A9]">World New Community</p>
+          <p className="text-sm uppercase tracking-[0.4em] text-[#F839A9] hidden">World New Community</p>
           <h1 className="text-4xl font-semibold leading-tight lg:text-5xl">
             Get more of <br className="hidden lg:block" /> the <br className="lg:hidden" /> music you love. ❤️
           </h1>

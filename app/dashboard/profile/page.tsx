@@ -1,16 +1,26 @@
 import { updatePasswordAction, updateProfileAction } from "@/app/actions";
 import { requireUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { DEFAULT_PROFILE_COVER_URL, getGlobalProfileCoverUrl } from "@/lib/data";
 import PasswordField from "@/app/ui/password-field";
-import { normalizeOptionalUrl } from "@/lib/avatar";
+import { normalizeOptionalUrl, resolveAvatarUrl } from "@/lib/avatar";
 
 export default async function DashboardProfilePage() {
   const user = await requireUser();
+  if (user.roles.includes("artist_admin") || user.roles.includes("super_admin")) {
+    redirect("/admin/profile");
+  }
+
   const globalCoverUrl = await getGlobalProfileCoverUrl();
   const profileCoverUrl =
     normalizeOptionalUrl(globalCoverUrl) ??
     normalizeOptionalUrl(user.coverImageUrl) ??
     DEFAULT_PROFILE_COVER_URL;
+  const profileAvatarUrl = resolveAvatarUrl({
+    avatarUrl: user.avatarUrl,
+    userId: user.id,
+    email: user.email,
+  });
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 lg:px-8">
@@ -23,6 +33,18 @@ export default async function DashboardProfilePage() {
         </div>
 
         <form action={updateProfileAction} className="mt-6 space-y-4">
+          <div className="flex items-center gap-4 rounded-2xl border border-[#ffd1e9] bg-[#fff8fc] p-4">
+            <img src={profileAvatarUrl} alt="Profile picture" className="h-20 w-20 rounded-full object-cover ring-4 ring-white" />
+            <label className="min-w-0 flex-1 text-sm font-semibold text-stone-700">
+              Upload profile picture
+              <input
+                type="file"
+                name="avatarFile"
+                accept="image/*"
+                className="mt-2 block w-full text-sm text-stone-600 file:mr-3 file:rounded-full file:border-0 file:bg-[#F839A9] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </label>
+          </div>
           <input
             name="displayName"
             defaultValue={user.displayName}
@@ -35,12 +57,6 @@ export default async function DashboardProfilePage() {
             rows={4}
             placeholder="Bio"
             className="w-full rounded-3xl border border-stone-200 px-4 py-3 text-sm"
-          />
-          <input
-            name="avatarUrl"
-            defaultValue={user.avatarUrl ?? ""}
-            placeholder="Profile picture URL"
-            className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
           />
           <button className="rounded-full bg-[#F839A9] px-5 py-2 text-sm font-semibold text-white">Save profile</button>
         </form>

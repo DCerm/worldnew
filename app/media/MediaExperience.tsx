@@ -2,345 +2,163 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { RiPlayFill, RiSearchLine } from "react-icons/ri";
 
 import type { AuthUser } from "@/lib/auth";
 import type { MediaCard } from "@/lib/data";
-import { SleekAudioPlayer, SleekVideoPlayer } from "@/app/ui/media-player";
+import {
+  MediaCategoryShelves,
+  MediaInfoDialog,
+  MediaPoster,
+} from "@/app/media/media-showcases";
+import { SleekVideoPlayer } from "@/app/ui/media-player";
+import { MEDIA_CATEGORIES, categoryHrefForSlug } from "@/lib/media-categories";
 
 type Props = {
   user: AuthUser | null;
   media: MediaCard[];
+  dashboardHref: string;
 };
 
-function canAccessMediaClient(user: AuthUser | null, media: MediaCard) {
-  if (media.visibility === "public") {
-    return true;
-  }
-
-  if (!user) {
-    return false;
-  }
-
-  if (user.roles.includes("artist_admin") || user.roles.includes("super_admin")) {
-    return true;
-  }
-
-  if (media.visibility === "community") {
-    return true;
-  }
-
-  if (media.visibility === "paid") {
-    return Boolean(user.activePlanCode);
-  }
-
-  if (media.visibility === "plan_specific") {
-    return Boolean(user.activePlanCode && media.planCodes.includes(user.activePlanCode));
-  }
-
-  return false;
-}
-
-function getVisibilityLabelClient(visibility: MediaCard["visibility"]) {
-  switch (visibility) {
-    case "public":
-      return "Public";
-    case "community":
-      return "Community";
-    case "paid":
-      return "Paid members";
-    case "plan_specific":
-      return "Specific plans";
-    default:
-      return "Restricted";
-  }
-}
-
-function MediaPoster({
-  item,
-  className,
-  fit = "object-cover",
-}: {
-  item: MediaCard;
-  className?: string;
-  fit?: "object-cover" | "object-contain";
-}) {
-  if (item.posterImageUrl) {
-    return (
-      <img
-        src={item.posterImageUrl}
-        alt={`${item.title} poster`}
-        loading="lazy"
-        decoding="async"
-        className={`${className ?? ""} ${fit}`}
-        onError={(event) => {
-          event.currentTarget.style.display = "none";
-        }}
-      />
-    );
-  }
-
+function TopSong({ item, index }: { item: MediaCard; index: number }) {
   return (
-    <div className={`${className ?? ""} bg-gradient-to-br from-[#F839A9]/25 via-stone-900 to-black`} />
+    <Link href={`/media/watch/${item.id}`} className="grid grid-cols-[24px_66px_1fr_40px] items-center gap-3 rounded-2xl p-2 transition hover:bg-[#fff0f7]">
+      <span className="text-sm font-black text-stone-950">{index + 1}</span>
+      <MediaPoster item={item} fit="object-cover" className="h-16 w-16 rounded-xl" />
+      <span className="min-w-0">
+        <strong className="block truncate text-sm font-black text-stone-950">{item.title}</strong>
+        <span className="block text-xs text-stone-500">franke&apos;</span>
+        <span className="block text-xs text-stone-500">0:{String(item.previewSeconds || 30).padStart(2, "0")}</span>
+      </span>
+      <span className="grid h-10 w-10 place-items-center rounded-full border border-stone-300 text-stone-950">
+        <RiPlayFill />
+      </span>
+    </Link>
   );
 }
 
-export default function MediaExperience({ user, media }: Props) {
+export default function MediaExperience({ user, media, dashboardHref }: Props) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const featuredItem = useMemo(() => {
-    const explicit = media.find((item) => item.isFeatured && item.mediaType === "video");
-    if (explicit) {
-      return explicit;
-    }
-
-    const firstVideo = media.find((item) => item.mediaType === "video");
-    return firstVideo ?? media[0] ?? null;
+    return media.find((item) => item.isFeatured && item.mediaType === "video")
+      ?? media.find((item) => item.mediaType === "video")
+      ?? media[0]
+      ?? null;
   }, [media]);
-
-  const grouped = useMemo(() => {
-    const groups = new Map<string, MediaCard[]>();
-    for (const item of media) {
-      const key = item.categoryName ?? "Featured Releases";
-      if (!groups.has(key)) {
-        groups.set(key, []);
-      }
-      groups.get(key)!.push(item);
-    }
-    return Array.from(groups.entries());
-  }, [media]);
-
-  const videoGroups = grouped
-    .map(([category, items]) => [category, items.filter((item) => item.mediaType === "video")] as const)
-    .filter(([, items]) => items.length > 0);
 
   const audioItems = media.filter((item) => item.mediaType === "audio");
-
   const selectedItem = selectedItemId ? media.find((item) => item.id === selectedItemId) ?? null : null;
-  const isAdminUser = Boolean(
-    user &&
-      (user.roles.includes("artist_admin") || user.roles.includes("super_admin"))
-  );
-  const communityHref = "/community";
-  const libraryHref = isAdminUser ? "/admin?tab=home" : "/dashboard?tab=home";
 
   return (
-    <main className="min-h-screen bg-black text-white overflow-hidden">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/80 backdrop-blur w-full">
-        <div className="mx-auto flex  items-center justify-between px-4 py-4 lg:px-8">
-          <Link href={user ? (isAdminUser ? "/admin" : "/dashboard") : "/login"} className="rounded-full border border-white/30 px-4 py-2 text-sm font-semibold">
-            { user ? "Back to dashboard" : "Sign In" }
-          </Link>
-          <nav className="flex flex-wrap items-center gap-3 text-sm">
-            <Link href={communityHref} className="hidden lg:block rounded-full border border-white/20 px-4 py-2 hover:border-[#F839A9]">
+    <main className="wn-media-page min-h-screen bg-white text-stone-950">
+      <header className="sticky top-0 z-40 bg-[#F839A9] text-white shadow-[0_18px_45px_-32px_rgba(248,57,169,.9)]">
+        <div className="mx-auto flex h-20 max-w-[1500px] items-center justify-between gap-5 px-5 lg:px-10">
+          <nav className="hidden items-center gap-9 text-sm font-black lg:flex">
+            <Link href="/media" className="border-b-2 border-white py-2 text-white">
+              Home
+            </Link>
+            {MEDIA_CATEGORIES.map((category) => (
+              <Link
+                key={category.slug}
+                href={categoryHrefForSlug(category.slug)}
+                className="border-b-2 border-transparent py-2 text-white/90 transition hover:border-white hover:text-white"
+              >
+                {category.label}
+              </Link>
+            ))}
+            <Link href="/community" className="border-b-2 border-transparent py-2 text-white/90 transition hover:border-white hover:text-white">
               Community
             </Link>
-            <Link href={libraryHref} className="hidden lg:block rounded-full border border-white/20 px-4 py-2 hover:border-[#F839A9]">
-              Library
+          </nav>
+
+          <Link href="/media" className="text-2xl font-black uppercase tracking-[-0.06em] lg:hidden">
+            World New
+          </Link>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-3 rounded-full border border-white/40 px-5 py-3 text-sm text-white/90 xl:flex">
+              Search movies, music, videos, mixtapes...
+              <RiSearchLine className="text-2xl" />
+            </div>
+            <Link href={user ? dashboardHref : "/login"} className="rounded-full border border-white/45 px-6 py-3 text-sm font-black">
+              Dashboard
             </Link>
-            <a href="https://worldnew.love" target="_blank" rel="noreferrer" className="rounded-full border border-white/20 px-4 py-2 hover:border-[#F839A9]">
+            <a href="https://worldnew.love" target="_blank" rel="noreferrer" className="hidden rounded-full border border-white/45 px-6 py-3 text-sm font-black sm:inline-flex">
               worldnew.love
             </a>
-          </nav>
+          </div>
         </div>
       </header>
 
-      <div className="relative overflow-hidden border-b border-white/10">
+      <section className="relative overflow-hidden p-0">
         {featuredItem?.mediaType === "video" && featuredItem.playbackUrl ? (
           <SleekVideoPlayer
+            key={featuredItem.id}
             src={featuredItem.playbackUrl}
             poster={featuredItem.posterImageUrl ?? undefined}
             autoPlay
             muted
+            loop
             videoClassName="object-cover"
             previewLimitSeconds={featuredItem.previewSeconds}
+            previewStartSeconds={featuredItem.previewStartSeconds ?? 0}
+            previewEndSeconds={featuredItem.previewEndSeconds ?? undefined}
             loopWithinPreview
             showControlsOverlay={false}
             showLoadingOverlay={false}
-            className="h-[55vh] w-full border-0 rounded-none md:h-[70vh]"
+            className="h-[58vh] w-full rounded-none border-0 md:h-[68vh]"
           />
-        ) : featuredItem ? (
-          <div className="h-[55vh] w-full md:h-[70vh]">
-            <MediaPoster item={featuredItem} className="h-full w-full" />
-          </div>
         ) : (
-          <div className="h-[55vh] w-full bg-gradient-to-b from-[#F839A9]/20 to-black md:h-[70vh]" />
+          <MediaPoster item={featuredItem} className="h-[58vh] w-full md:h-[68vh]" />
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-7xl px-4 pb-10 lg:px-0">
-          <p className="text-sm uppercase tracking-[0.3em] text-[#F839A9]">Featured Now</p>
-          <h1 className="mt-0 max-w-4xl text-4xl font-bold lg:text-5xl">{featuredItem?.title ?? "Featured Piece"}</h1>
-          <p className="mt-4 max-w-2xl text-lg text-stone-300">{featuredItem?.description ?? "This is a featured video piece, published on xxx in the last Europe tour."}</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            {featuredItem && (
-              <Link
-                href={`/media/watch/${featuredItem.id}`}
-                className="pointer-events-auto rounded-full bg-[#F839A9] px-6 py-3 text-sm font-semibold text-white"
-              >
-                Play
-              </Link>
-            )}
-            {featuredItem && (
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-black/10" />
+        <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[1500px] px-6 pb-10 text-white lg:px-10">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-[#F839A9]">Featured Now</p>
+          <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight md:text-5xl">
+            {featuredItem?.title ?? "franke' - together (music video)"}
+          </h1>
+          <p className="mt-4 max-w-xl text-sm font-semibold text-white/90">
+            {featuredItem?.description ?? "This is one of the first songs I ever wrote."}
+          </p>
+          <div className="mt-7 flex flex-wrap gap-4">
+            <Link href={featuredItem ? `/media/watch/${featuredItem.id}` : "/media"} className="inline-flex items-center gap-2 rounded-full bg-[#F839A9] px-8 py-3 text-sm font-black text-white">
+              <RiPlayFill /> Play
+            </Link>
+            {featuredItem ? (
               <button
-                onClick={() => setSelectedItemId(featuredItem.id)}
-                className="pointer-events-auto rounded-full border border-white/50 bg-black/50 px-6 py-3 text-sm font-semibold"
                 type="button"
+                onClick={() => setSelectedItemId(featuredItem.id)}
+                className="rounded-full border border-white px-8 py-3 text-sm font-black text-white"
               >
                 View More Info
               </button>
-            )}
+            ) : null}
           </div>
         </div>
-      </div>
+      </section>
 
-      <section className="mx-auto grid max-w-7xl gap-8 overflow-x-hidden px-4 py-8 lg:grid-cols-3 lg:px-0">
-        <div className="min-w-0 space-y-8 lg:col-span-2">
-          {videoGroups.map(([category, items]) => (
-            <div key={category} className="min-w-0 space-y-4">
-              <div className="flex w-full items-center justify-between gap-3">
-                <h2 className="min-w-0 flex-1 truncate text-xl font-semibold sm:text-2xl">{category}</h2>
-                <Link
-                  href={`/media/category/${items[0].categorySlug ?? "uncategorized"}`}
-                  className="flex-none whitespace-nowrap text-sm font-semibold text-[#F839A9]"
-                >
-                  View all
-                </Link>
-              </div>
-              <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-2 pr-1 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/20">
-                {items.map((item) => {
-                  const allowed = canAccessMediaClient(user, item);
-                  return (
-                    <article
-                      key={item.id}
-                      className="w-[78vw] max-w-[340px] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 bg-stone-950/70 sm:w-[320px]"
-                    >
-                      <div className="relative h-44 overflow-hidden rounded-t-xl">
-                        <MediaPoster item={item} className="h-full w-full" />
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-                        <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
-                          <p className="text-xs uppercase tracking-[0.2em] text-stone-200">{item.mediaType}</p>
-                          {item.isFeatured && <span className="text-xs font-semibold text-[#7ec4ff]">FEATURED</span>}
-                        </div>
-                      </div>
-                      <div className="space-y-3 p-4">
-                        <h3 className="text-xl font-semibold">{item.title}</h3>
-                        <div className="flex items-center justify-between">
-                          <span className="rounded-full border border-white/20 px-2 py-1 text-xs text-stone-300">
-                            {getVisibilityLabelClient(item.visibility)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Link href={`/media/watch/${item.id}`} className="rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold">
-                            Play
-                          </Link>
-                          <button
-                            onClick={() => setSelectedItemId(item.id)}
-                            type="button"
-                            className="rounded-full border border-[#F839A9] px-3 py-2 text-xs font-semibold text-[#F839A9]"
-                          >
-                            View More Info
-                          </button>
-                        </div>
-                        {!allowed && (
-                          <p className="text-xs text-stone-400">Locked until your membership has access.</p>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+      <section className="mx-auto grid max-w-[1500px] gap-8 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:px-10">
+        <div className="min-w-0">
+          <MediaCategoryShelves media={media} user={user} onInfo={setSelectedItemId} />
         </div>
 
-        <aside className="space-y-5 rounded-2xl border border-white/10 bg-stone-950/70 p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Music</h2>
-            <Link href="/media/audio" className="text-sm font-semibold text-[#F839A9]">
-              View all music
-            </Link>
+        <aside className="h-fit rounded-2xl border border-stone-100 bg-white p-6 shadow-[0_24px_65px_-44px_rgba(15,23,42,.75)] lg:sticky lg:top-28">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-black">Top Songs</h2>
+            <Link href="/media/audio" className="text-sm font-black text-[#F839A9]">View all</Link>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {audioItems.length > 0 ? (
-              audioItems.slice(0, 8).map((item) => {
-                const allowed = canAccessMediaClient(user, item);
-                return (
-                  <article key={item.id} className="rounded-xl border border-white/10 bg-black/30 p-2.5">
-                    <div className="mb-2 flex h-44 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
-                      <MediaPoster item={item} fit="object-contain" className="h-full w-full" />
-                    </div>
-                    <p className="truncate text-[10px] uppercase tracking-[0.16em] text-stone-400">{item.categoryName ?? "General"}</p>
-                    <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
-                    {allowed && item.playbackUrl ? (
-                      <SleekAudioPlayer
-                        className="mt-2"
-                        src={item.playbackUrl}
-                        previewLimitSeconds={item.previewSeconds}
-                      />
-                    ) : (
-                      <p className="mt-2 text-[11px] text-stone-400">Locked for your membership level.</p>
-                    )}
-                  </article>
-                );
-              })
-            ) : (
-              <p className="text-sm text-stone-400">No audio titles published yet.</p>
-            )}
+          <div className="space-y-3">
+            {audioItems.slice(0, 6).map((item, index) => <TopSong key={item.id} item={item} index={index} />)}
+            {audioItems.length === 0 ? <p className="text-sm text-stone-500">No songs published yet.</p> : null}
           </div>
+          <Link href="/media/audio" className="mt-6 inline-flex items-center gap-2 text-sm font-black text-[#F839A9]">
+            See full playlist <span>›</span>
+          </Link>
         </aside>
       </section>
 
-      {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
-          <div className="w-[92vw] max-w-4xl rounded-2xl border border-white/10 bg-stone-950 p-5 lg:w-[56vw]">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-semibold">{selectedItem.title}</h3>
-                <p className="mt-1 text-xs uppercase tracking-[0.2em] text-stone-400">
-                  {selectedItem.mediaType} • {selectedItem.categoryName ?? "General"}
-                </p>
-              </div>
-              <button onClick={() => setSelectedItemId(null)} type="button" className="rounded-full border border-white/30 px-3 py-1 text-sm">
-                Close
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {selectedItem.playbackUrl && selectedItem.mediaType === "video" ? (
-                <SleekVideoPlayer
-                  className="w-full rounded-xl"
-                  poster={selectedItem.posterImageUrl ?? undefined}
-                  src={selectedItem.playbackUrl}
-                  autoPlay
-                  previewLimitSeconds={selectedItem.previewSeconds ?? 30}
-                />
-              ) : selectedItem.playbackUrl ? (
-                <SleekAudioPlayer
-                  src={selectedItem.playbackUrl}
-                  previewLimitSeconds={selectedItem.previewSeconds}
-                />
-              ) : null}
-
-              <p className="text-sm text-stone-300">{selectedItem.description ?? "No description provided yet."}</p>
-
-              {selectedItem.featuredArtists && (
-                <p className="text-sm text-stone-300">
-                  <span className="font-semibold text-white">Featured artists:</span> {selectedItem.featuredArtists}
-                </p>
-              )}
-
-              {selectedItem.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {selectedItem.tags.map((tag) => (
-                    <span key={tag} className="rounded-full border border-white/20 px-3 py-1 text-xs text-stone-300">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <MediaInfoDialog item={selectedItem} onClose={() => setSelectedItemId(null)} />
     </main>
   );
 }

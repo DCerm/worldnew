@@ -329,6 +329,7 @@ CREATE TABLE groups (
   slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   visibility group_visibility NOT NULL DEFAULT 'public',
   owner_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   cover_image_url TEXT,

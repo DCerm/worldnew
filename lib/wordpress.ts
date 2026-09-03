@@ -49,13 +49,22 @@ export type WordPressMusicTrack = {
   genre: string;
   duration: string;
   preview_seconds?: number | null;
+  preview_start_seconds?: number | null;
+  preview_end_seconds?: number | null;
   cover_image_url: string;
   stream_url: string;
   price: number | null;
+  community_price?: number | null;
+  display_price?: number | null;
   currency: string;
   checkout_url: string;
+  community_checkout_url?: string | null;
   product_url: string;
   is_featured: boolean;
+  show_on_website?: boolean;
+  show_on_community?: boolean;
+  album_show_on_community?: boolean;
+  community_playback_mode?: "preview" | "full" | "members_full";
   can_download?: boolean;
   download_url?: string;
 };
@@ -67,7 +76,7 @@ type WordPressMusicCatalogResponse = {
 
 export type WordPressMusicProduct = {
   id: number;
-  kind: "track" | "bundle";
+  kind: "track" | "bundle" | "video";
   title: string;
   artist: string;
   genre: string;
@@ -75,15 +84,43 @@ export type WordPressMusicProduct = {
   short_description?: string | null;
   duration?: string | null;
   preview_seconds?: number | null;
+  preview_start_seconds?: number | null;
+  preview_end_seconds?: number | null;
   stream_url?: string | null;
   cover_image_url: string;
   price: number | null;
+  community_price?: number | null;
+  display_price?: number | null;
   currency: string;
   is_featured: boolean;
+  show_on_website?: boolean;
+  show_on_community?: boolean;
+  album_show_on_community?: boolean;
+  community_playback_mode?: "preview" | "full" | "members_full";
+  community_category?: "movies" | "reels" | "mixtapes" | "behind-the-scenes";
+  poster_image_url?: string | null;
   status: string;
+  published_at?: string | null;
   product_url: string;
+  community_checkout_url?: string | null;
   edit_url?: string | null;
   category_slugs?: string[];
+  album_package?: {
+    zip_url?: string | null;
+    tracklist_pdf_url?: string | null;
+    thankyou_pdf_url?: string | null;
+    itunes_guide_pdf_url?: string | null;
+  } | null;
+  album_package_mode?: "existing_tracks" | "zip_package" | null;
+  album_community_offer?: {
+    price?: string | null;
+    track_price?: string | null;
+    enable_offer_price?: boolean;
+    minimum_offer_price?: string | null;
+    enable_donation?: boolean;
+    allow_individual_track_sales?: boolean;
+  } | null;
+  album_track_product_ids?: number[];
   bundle_tracks: WordPressMusicTrack[];
 };
 
@@ -299,6 +336,7 @@ async function fetchWordPressEndpointWithFallback(
 export async function getWordPressMusicCatalog(options: {
   featuredOnly?: boolean;
   limit?: number;
+  target?: "website" | "community";
 } = {}) {
   const endpoint = getWordPressMusicCatalogUrl();
 
@@ -313,6 +351,7 @@ export async function getWordPressMusicCatalog(options: {
 
   url.searchParams.set("limit", String(limit));
   url.searchParams.set("category", "track");
+  url.searchParams.set("target", options.target ?? "community");
   if (options.featuredOnly) {
     url.searchParams.set("featured", "yes");
   }
@@ -406,15 +445,31 @@ export async function getWordPressPlanPrices(
 
 export async function upsertWordPressMusicProduct(input: {
   productId?: number | null;
+  kind?: "track" | "bundle" | "album";
   title: string;
   description?: string | null;
   artist?: string | null;
   genre?: string | null;
   duration?: string | null;
   coverImageUrl?: string | null;
-  streamUrl: string;
+  streamUrl?: string | null;
   price?: string | number | null;
+  communityPrice?: string | number | null;
   previewSeconds?: number | null;
+  previewStartSeconds?: number | null;
+  previewEndSeconds?: number | null;
+  showOnWebsite?: boolean;
+  showOnCommunity?: boolean;
+  communityPlaybackMode?: "preview" | "full" | "members_full";
+  albumShowOnCommunity?: boolean;
+  albumPackageMode?: "existing_tracks" | "zip_package" | null;
+  albumPackageZipUrl?: string | null;
+  albumCommunityPrice?: string | number | null;
+  albumEnableOfferPrice?: boolean;
+  albumMinimumOfferPrice?: string | number | null;
+  albumEnableDonation?: boolean;
+  albumAllowIndividualTrackSales?: boolean;
+  albumTrackProductIds?: number[] | null;
   isFeatured?: boolean;
   status?: string | null;
 }) {
@@ -426,18 +481,42 @@ export async function upsertWordPressMusicProduct(input: {
 
   const payload = await postSignedWordPressJson<WordPressMusicAdminUpsertResponse>(endpoint, {
     product_id: input.productId && input.productId > 0 ? input.productId : null,
+    kind: input.kind ?? "track",
     title: input.title,
     description: input.description ?? "",
     artist: input.artist ?? "",
     genre: input.genre ?? "",
     duration: input.duration ?? "",
     cover_image_url: input.coverImageUrl ?? "",
-    stream_url: input.streamUrl,
+    stream_url: input.streamUrl ?? "",
     price: input.price ?? "",
+    community_price: input.communityPrice ?? "",
     preview_seconds:
       typeof input.previewSeconds === "number" && Number.isFinite(input.previewSeconds)
         ? Math.max(5, Math.floor(input.previewSeconds))
         : 30,
+    preview_start_seconds:
+      typeof input.previewStartSeconds === "number" && Number.isFinite(input.previewStartSeconds)
+        ? Math.max(0, Math.floor(input.previewStartSeconds))
+        : 0,
+    preview_end_seconds:
+      typeof input.previewEndSeconds === "number" && Number.isFinite(input.previewEndSeconds)
+        ? Math.max(0, Math.floor(input.previewEndSeconds))
+        : 0,
+    show_on_website: input.showOnWebsite ?? true,
+    show_on_community: input.showOnCommunity ?? true,
+    community_playback_mode: input.communityPlaybackMode ?? "preview",
+    album_show_on_community: input.albumShowOnCommunity ?? input.showOnCommunity ?? true,
+    album_package_mode: input.albumPackageMode ?? undefined,
+    album_package_zip_url: input.albumPackageZipUrl ?? "",
+    album_community_price: input.albumCommunityPrice ?? "",
+    album_enable_offer_price: input.albumEnableOfferPrice ?? false,
+    album_minimum_offer_price: input.albumMinimumOfferPrice ?? "",
+    album_enable_donation: input.albumEnableDonation ?? false,
+    album_allow_individual_track_sales: input.albumAllowIndividualTrackSales ?? false,
+    album_track_product_ids: Array.isArray(input.albumTrackProductIds)
+      ? input.albumTrackProductIds.filter((id) => Number.isInteger(id) && id > 0)
+      : undefined,
     is_featured: input.isFeatured ?? false,
     status: input.status ?? "publish",
   });
@@ -1309,6 +1388,66 @@ export async function getCheckoutRedirectUrl(
   if (
     (result.wordpress_user_id && result.wordpress_user_id > 0) ||
     (result.wordpress_customer_id && result.wordpress_customer_id > 0)
+  ) {
+    await sql`
+      update users
+      set
+        wordpress_user_id = coalesce(${result.wordpress_user_id ?? null}, wordpress_user_id),
+        wordpress_customer_id = coalesce(${result.wordpress_customer_id ?? null}, wordpress_customer_id),
+        updated_at = now()
+      where id = ${user.id}
+    `;
+  }
+
+  return result.redirect_url;
+}
+
+export async function getProductCheckoutRedirectUrl(
+  productId: number,
+  user: AuthUser,
+  options?: {
+    returnTo?: string | null;
+    useCommunityPrice?: boolean;
+  }
+) {
+  const checkoutSessionUrl = getWordPressCheckoutSessionUrl();
+
+  if (!checkoutSessionUrl) {
+    throw new Error(
+      "WORDPRESS_CHECKOUT_SESSION_API_URL or WORDPRESS_BASE_URL is not configured."
+    );
+  }
+
+  if (!Number.isFinite(productId) || productId < 1) {
+    throw new Error("A valid WooCommerce product id is required.");
+  }
+
+  const payload: Record<string, unknown> = {
+    email: user.email,
+    display_name: user.displayName,
+    username: user.username,
+    product_id: Math.floor(productId),
+    variation_id: null,
+    return_to: options?.returnTo ?? "/media/audio",
+    use_community_price: options?.useCommunityPrice ?? true,
+  };
+
+  const result = await postSignedWordPressJson<{
+    success?: boolean;
+    redirect_url?: string;
+    wordpress_user_id?: number | null;
+    wordpress_customer_id?: number | null;
+  }>(checkoutSessionUrl, payload);
+
+  if (!result.success || !result.redirect_url) {
+    throw new Error("WordPress did not return a valid checkout session URL.");
+  }
+
+  const sql = getSql();
+  if (
+    sql &&
+    ((result.wordpress_user_id && result.wordpress_user_id > 0) ||
+      (result.wordpress_customer_id && result.wordpress_customer_id > 0))
   ) {
     await sql`
       update users

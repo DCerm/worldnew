@@ -27,6 +27,8 @@ type SleekAudioPlayerProps = {
   autoPlay?: boolean;
   className?: string;
   previewLimitSeconds?: number;
+  previewStartSeconds?: number;
+  previewEndSeconds?: number;
 };
 
 export function SleekAudioPlayer({
@@ -34,6 +36,8 @@ export function SleekAudioPlayer({
   autoPlay = false,
   className = "",
   previewLimitSeconds,
+  previewStartSeconds = 0,
+  previewEndSeconds,
 }: SleekAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -43,6 +47,13 @@ export function SleekAudioPlayer({
   const [shouldLoadSource, setShouldLoadSource] = useState(autoPlay);
   const [requestedPlay, setRequestedPlay] = useState(autoPlay);
   const [isLoading, setIsLoading] = useState(autoPlay);
+  const previewStart = Math.max(0, Math.floor(previewStartSeconds || 0));
+  const effectivePreviewEnd =
+    previewLimitSeconds && previewLimitSeconds > 0
+      ? previewEndSeconds && previewEndSeconds > previewStart
+        ? previewEndSeconds
+        : previewStart + previewLimitSeconds
+      : null;
 
   useEffect(() => {
     setShouldLoadSource(autoPlay);
@@ -81,6 +92,10 @@ export function SleekAudioPlayer({
 
       if (!requestedPlay) {
         return;
+      }
+
+      if (effectivePreviewEnd && (audio.currentTime < previewStart || audio.currentTime >= effectivePreviewEnd)) {
+        audio.currentTime = previewStart;
       }
 
       await audio.play().catch(() => undefined);
@@ -125,7 +140,7 @@ export function SleekAudioPlayer({
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("error", handleError);
     };
-  }, [requestedPlay, shouldLoadSource]);
+  }, [effectivePreviewEnd, previewStart, requestedPlay, shouldLoadSource]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -143,18 +158,18 @@ export function SleekAudioPlayer({
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !previewLimitSeconds || previewLimitSeconds <= 0) {
+    if (!audio || !effectivePreviewEnd) {
       return;
     }
 
     const handlePreviewLimit = () => {
-      if (audio.currentTime < previewLimitSeconds) {
+      if (audio.currentTime < effectivePreviewEnd) {
         return;
       }
 
       audio.pause();
-      audio.currentTime = 0;
-      setCurrentTime(0);
+      audio.currentTime = previewStart;
+      setCurrentTime(previewStart);
       setIsPlaying(false);
     };
 
@@ -163,17 +178,20 @@ export function SleekAudioPlayer({
     return () => {
       audio.removeEventListener("timeupdate", handlePreviewLimit);
     };
-  }, [previewLimitSeconds, src]);
+  }, [effectivePreviewEnd, previewStart, src]);
 
   const progressMax = useMemo(
     () =>
-      previewLimitSeconds && previewLimitSeconds > 0
-        ? Math.min(duration || previewLimitSeconds, previewLimitSeconds)
+      effectivePreviewEnd
+        ? Math.max(0, effectivePreviewEnd - previewStart)
         : duration > 0
         ? duration
         : 0,
-    [duration, previewLimitSeconds]
+    [duration, effectivePreviewEnd, previewStart]
   );
+  const displayedCurrentTime = effectivePreviewEnd
+    ? Math.max(0, currentTime - previewStart)
+    : currentTime;
 
   const togglePlay = async () => {
     const audio = audioRef.current;
@@ -191,6 +209,9 @@ export function SleekAudioPlayer({
     if (audio.paused) {
       setRequestedPlay(true);
       setIsLoading(true);
+      if (effectivePreviewEnd && (audio.currentTime < previewStart || audio.currentTime >= effectivePreviewEnd)) {
+        audio.currentTime = previewStart;
+      }
       await audio.play().catch(() => undefined);
       return;
     }
@@ -250,7 +271,7 @@ export function SleekAudioPlayer({
           {isMuted ? <RiVolumeMuteLine /> : <RiVolumeUpLine />}
         </button>
         <span className="ml-auto text-xs text-stone-300">
-          {formatTime(currentTime)} / {formatTime(progressMax)}
+          {formatTime(displayedCurrentTime)} / {formatTime(progressMax)}
         </span>
       </div>
 
@@ -259,15 +280,16 @@ export function SleekAudioPlayer({
         min={0}
         max={progressMax}
         step={0.1}
-        value={Math.min(currentTime, progressMax)}
+        value={Math.min(displayedCurrentTime, progressMax)}
         onChange={(event) => {
           const audio = audioRef.current;
           if (!audio) {
             return;
           }
           const nextTime = Number(event.target.value) || 0;
-          audio.currentTime = nextTime;
-          setCurrentTime(nextTime);
+          const absoluteTime = effectivePreviewEnd ? previewStart + nextTime : nextTime;
+          audio.currentTime = absoluteTime;
+          setCurrentTime(absoluteTime);
         }}
         className="mt-3 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-stone-700 accent-[#F839A9]"
       />
@@ -284,6 +306,8 @@ type SleekVideoPlayerProps = {
   className?: string;
   videoClassName?: string;
   previewLimitSeconds?: number;
+  previewStartSeconds?: number;
+  previewEndSeconds?: number;
   loopWithinPreview?: boolean;
   showControlsOverlay?: boolean;
   showLoadingOverlay?: boolean;
@@ -298,6 +322,8 @@ export function SleekVideoPlayer({
   className = "",
   videoClassName = "object-contain",
   previewLimitSeconds,
+  previewStartSeconds = 0,
+  previewEndSeconds,
   loopWithinPreview = false,
   showControlsOverlay = true,
   showLoadingOverlay = true,
@@ -312,6 +338,13 @@ export function SleekVideoPlayer({
   const [shouldLoadSource, setShouldLoadSource] = useState(autoPlay);
   const [requestedPlay, setRequestedPlay] = useState(autoPlay);
   const [isLoading, setIsLoading] = useState(autoPlay);
+  const previewStart = Math.max(0, Math.floor(previewStartSeconds || 0));
+  const effectivePreviewEnd =
+    previewLimitSeconds && previewLimitSeconds > 0
+      ? previewEndSeconds && previewEndSeconds > previewStart
+        ? previewEndSeconds
+        : previewStart + previewLimitSeconds
+      : null;
 
   useEffect(() => {
     setShouldLoadSource(autoPlay);
@@ -353,6 +386,10 @@ export function SleekVideoPlayer({
 
       if (!requestedPlay) {
         return;
+      }
+
+      if (effectivePreviewEnd && (video.currentTime < previewStart || video.currentTime >= effectivePreviewEnd)) {
+        video.currentTime = previewStart;
       }
 
       await video.play().catch(() => undefined);
@@ -397,7 +434,7 @@ export function SleekVideoPlayer({
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("error", handleError);
     };
-  }, [muted, requestedPlay, shouldLoadSource]);
+  }, [effectivePreviewEnd, muted, previewStart, requestedPlay, shouldLoadSource]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -415,24 +452,42 @@ export function SleekVideoPlayer({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !previewLimitSeconds || previewLimitSeconds <= 0) {
+    if (!video || !autoPlay || !shouldLoadSource) {
+      return;
+    }
+
+    const playTimer = window.setTimeout(() => {
+      if (effectivePreviewEnd && (video.currentTime < previewStart || video.currentTime >= effectivePreviewEnd)) {
+        video.currentTime = previewStart;
+      }
+      void video.play().catch(() => undefined);
+    }, 75);
+
+    return () => {
+      window.clearTimeout(playTimer);
+    };
+  }, [autoPlay, effectivePreviewEnd, previewStart, shouldLoadSource, src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !effectivePreviewEnd) {
       return;
     }
 
     const handlePreviewLimit = () => {
-      if (video.currentTime < previewLimitSeconds) {
+      if (video.currentTime < effectivePreviewEnd) {
         return;
       }
 
       if (loopWithinPreview) {
-        video.currentTime = 0;
+        video.currentTime = previewStart;
         void video.play().catch(() => undefined);
         return;
       }
 
       video.pause();
-      video.currentTime = 0;
-      setCurrentTime(0);
+      video.currentTime = previewStart;
+      setCurrentTime(previewStart);
       setIsPlaying(false);
     };
 
@@ -441,7 +496,7 @@ export function SleekVideoPlayer({
     return () => {
       video.removeEventListener("timeupdate", handlePreviewLimit);
     };
-  }, [loopWithinPreview, previewLimitSeconds, src]);
+  }, [effectivePreviewEnd, loopWithinPreview, previewStart, src]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -470,6 +525,9 @@ export function SleekVideoPlayer({
 
       setRequestedPlay(true);
       setIsLoading(true);
+      if (effectivePreviewEnd && (video.currentTime < previewStart || video.currentTime >= effectivePreviewEnd)) {
+        video.currentTime = previewStart;
+      }
       await video.play().catch(() => undefined);
       return;
     }
@@ -504,11 +562,14 @@ export function SleekVideoPlayer({
   };
 
   const progressMax =
-    previewLimitSeconds && previewLimitSeconds > 0
-      ? Math.min(duration || previewLimitSeconds, previewLimitSeconds)
+    effectivePreviewEnd
+      ? Math.max(0, effectivePreviewEnd - previewStart)
       : duration > 0
       ? duration
       : 0;
+  const displayedCurrentTime = effectivePreviewEnd
+    ? Math.max(0, currentTime - previewStart)
+    : currentTime;
 
   return (
     <div
@@ -519,6 +580,8 @@ export function SleekVideoPlayer({
       <video
         ref={videoRef}
         poster={poster}
+        autoPlay={autoPlay}
+        muted={muted}
         preload={shouldLoadSource ? "metadata" : "none"}
         loop={loop}
         playsInline
@@ -576,7 +639,7 @@ export function SleekVideoPlayer({
             </span>
           </button>
           <span className="ml-auto text-[11px] text-stone-200 sm:text-xs">
-            {formatTime(currentTime)} / {formatTime(progressMax)}
+            {formatTime(displayedCurrentTime)} / {formatTime(progressMax)}
           </span>
         </div>
 
@@ -585,15 +648,16 @@ export function SleekVideoPlayer({
           min={0}
           max={progressMax}
           step={0.1}
-          value={Math.min(currentTime, progressMax)}
+          value={Math.min(displayedCurrentTime, progressMax)}
           onChange={(event) => {
             const video = videoRef.current;
             if (!video) {
               return;
             }
             const nextTime = Number(event.target.value) || 0;
-            video.currentTime = nextTime;
-            setCurrentTime(nextTime);
+            const absoluteTime = effectivePreviewEnd ? previewStart + nextTime : nextTime;
+            video.currentTime = absoluteTime;
+            setCurrentTime(absoluteTime);
           }}
           className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-stone-600 accent-[#F839A9]"
         />

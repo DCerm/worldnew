@@ -1,153 +1,182 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
-  RiDoorClosedLine,
-  RiDoorOpenLine,
+  RiBriefcaseLine,
+  RiFilmLine,
   RiHome4Line,
   RiLogoutBoxRLine,
+  RiMenuLine,
+  RiMovie2Line,
   RiMusic2Line,
+  RiSettings3Line,
+  RiShoppingBag3Line,
   RiTeamLine,
   RiUser2Line,
-} from 'react-icons/ri';
+  RiVideoLine,
+} from "react-icons/ri";
+import { useState } from "react";
 
-export default function RootLayout({
+const topLinks = [
+  { href: "/dashboard?tab=home", label: "Home" },
+  { href: "/media/category/movies", label: "Movies" },
+  { href: "/media/audio", label: "Music" },
+  { href: "/media", label: "Videos" },
+  { href: "/media/category/mixtapes", label: "Mixtapes" },
+  { href: "/media/category/reels", label: "Reels" },
+  { href: "/media/category/behind-the-scenes", label: "Behind the Scenes" },
+  { href: "/community", label: "Community" },
+];
+
+const sideLinks = [
+  { href: "/dashboard?tab=home", label: "Home", icon: RiHome4Line },
+  { href: "/media/category/movies", label: "Movies", icon: RiMovie2Line },
+  { href: "/media/audio", label: "Music", icon: RiMusic2Line },
+  { href: "/media", label: "Videos", icon: RiVideoLine },
+  { href: "/media/category/mixtapes", label: "Mixtapes", icon: RiFilmLine },
+  { href: "/media/category/reels", label: "Reels", icon: RiFilmLine },
+  { href: "/media/category/behind-the-scenes", label: "Behind the Scenes", icon: RiBriefcaseLine },
+  { href: "/community", label: "Community", icon: RiTeamLine },
+  { href: "https://worldnew.love", label: "Shop", icon: RiShoppingBag3Line, external: true },
+  { href: "/dashboard/profile", label: "Profile", icon: RiUser2Line },
+  { href: "/dashboard/profile", label: "Settings", icon: RiSettings3Line },
+];
+
+function isActive(pathname: string | null, href: string) {
+  if (!pathname) {
+    return false;
+  }
+
+  if (href.startsWith("http")) {
+    return false;
+  }
+
+  const cleanHref = href.split("?")[0];
+  if (cleanHref === "/dashboard") {
+    return pathname === "/dashboard";
+  }
+
+  return pathname === cleanHref || pathname.startsWith(`${cleanHref}/`);
+}
+
+export default function DashboardLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const previousIsMobileRef = useRef<boolean | null>(null);
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 1024;
-      setIsMobile(mobile);
+  const sidebar = (
+    <div className="flex h-full flex-col">
+      <div className="flex h-24 items-center px-8 lg:hidden">
+        <Link href="/dashboard?tab=home" className="leading-none ">
+          <span className="block text-3xl font-black uppercase leading-[0.85] tracking-[-0.06em] text-[#12351f]">
+            World
+          </span>
+          <span className="block text-3xl font-black uppercase leading-[0.85] tracking-[-0.06em] text-[#12351f]">
+            New
+          </span>
+        </Link>
+      </div>
 
-      if (previousIsMobileRef.current === null) {
-        previousIsMobileRef.current = mobile;
-        setSidebarOpen(!mobile);
-        setIsReady(true);
-        return;
-      }
+      <nav className="flex-1 space-y-2 overflow-y-auto px-5 py-8">
+        {sideLinks.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(pathname, item.href);
+          const className = `flex items-center gap-4 rounded-2xl px-5 py-4 text-sm font-bold transition ${
+            active
+              ? "bg-white text-[#F839A9] shadow-[0_18px_45px_-30px_rgba(248,57,169,.9)]"
+              : "text-stone-700 hover:bg-white/70 hover:text-[#F839A9]"
+          }`;
 
-      if (mobile && previousIsMobileRef.current === false) {
-        setSidebarOpen(false);
-      }
+          if (item.external) {
+            return (
+              <a key={item.label} href={item.href} className={className} target="_blank" rel="noreferrer">
+                <Icon className="text-xl" />
+                <span>{item.label}</span>
+              </a>
+            );
+          }
 
-      if (!mobile && previousIsMobileRef.current === true) {
-        setSidebarOpen(true);
-      }
+          return (
+            <Link key={item.label} href={item.href} className={className} onClick={() => setMobileOpen(false)}>
+              <Icon className="text-xl" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
-      previousIsMobileRef.current = mobile;
-      setIsReady(true);
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const desktopSidebarWidth = sidebarOpen ? 'lg:ml-64' : 'lg:ml-24';
+      <form action="/logout" method="post" className="px-5 py-6">
+        <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-sm font-bold text-stone-700 transition hover:bg-white/70 hover:text-[#F839A9]">
+          <RiLogoutBoxRLine className="text-xl" />
+          <span>Log out</span>
+        </button>
+      </form>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
-      <aside
-        className={`fixed left-0 top-0 z-40 flex h-screen flex-col rounded-r-2xl bg-black text-white transition-all duration-300 ${
-          isMobile
-            ? sidebarOpen
-              ? 'w-64 translate-x-0'
-              : 'w-64 -translate-x-full'
-            : sidebarOpen
-              ? 'w-64'
-              : 'w-24'
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-gray-700 p-4">
-          {sidebarOpen && !isMobile ? (
-            <span className="hidden text-xl font-bold lg:block">Dashboard</span>
-          ) : null}
+    <div className="min-h-screen bg-white text-stone-950">
+      <header className="fixed inset-x-0 top-0 z-40 h-20 bg-[#F839A9] text-white shadow-[0_18px_45px_-32px_rgba(248,57,169,.9)]">
+        <div className="flex h-full items-center justify-between gap-5 px-5 lg:px-10">
           <button
-            onClick={() => setSidebarOpen((prev) => !prev)}
-            className="hidden text-xl text-white lg:block"
+            type="button"
+            className="rounded-full border border-white/35 p-2 text-2xl lg:hidden"
+            onClick={() => setMobileOpen(true)}
           >
-            {sidebarOpen ? <RiDoorOpenLine /> : <RiDoorClosedLine />}
+            <RiMenuLine />
+            <span className="sr-only">Open menu</span>
           </button>
-        </div>
 
-        <nav className="flex-1 space-y-2 overflow-y-auto p-4">
-          <Link
-            href="/dashboard?tab=home"
-            className="flex items-center space-x-2 rounded p-2 hover:bg-gray-700"
-          >
-            <RiHome4Line />
-            {sidebarOpen || isMobile ? <span>Home</span> : null}
+          <Link href="/dashboard?tab=home" className="hidden text-2xl font-black uppercase tracking-[-0.06em] lg:block">
+            World New
           </Link>
-          <Link
-            href="/media"
-            className="flex items-center space-x-2 rounded p-2 hover:bg-gray-700"
-          >
-            <RiMusic2Line />
-            {sidebarOpen || isMobile ? <span>Music + Videos</span> : null}
-          </Link>
-          <Link
-            href="/community"
-            className="flex items-center space-x-2 rounded p-2 hover:bg-gray-700"
-          >
-            <RiTeamLine />
-            {sidebarOpen || isMobile ? <span>Community</span> : null}
-          </Link>
-          <Link
-            href="/dashboard/profile"
-            className="flex items-center space-x-2 rounded p-2 hover:bg-gray-700"
-          >
-            <RiUser2Line />
-            {sidebarOpen || isMobile ? <span>Profile</span> : null}
-          </Link>
-        </nav>
 
-        <div className="border-t border-gray-700 p-4">
-          <form action="/logout" method="post">
-            <button
-              type="submit"
-              className="flex w-full items-center space-x-2 rounded bg-gray-800 p-2 text-red-500 hover:bg-gray-700"
-            >
-              <RiLogoutBoxRLine />
-              {sidebarOpen || isMobile ? <span>Log out</span> : null}
-            </button>
-          </form>
+          <nav className="hidden flex-1 items-center justify-center gap-4 text-sm font-bold xl:gap-7 lg:flex">
+            {topLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`border-b-2 py-2 transition ${
+                  isActive(pathname, link.href) ? "border-white text-white" : "border-transparent text-white/85 hover:text-white"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-4 lg:flex-none">
+            <div className="hidden w-[min(34vw,420px)] items-center rounded-full border border-white/40 px-5 py-3 text-sm text-white/85 lg:flex">
+              Search movies, music, videos, mixtapes...
+            </div>
+            <Link href="/dashboard/profile" className="grid h-10 w-10 place-items-center rounded-full bg-white text-sm font-black text-[#F839A9]">
+              WN
+            </Link>
+          </div>
         </div>
+      </header>
+
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 bg-[#fff0f7] pt-20 lg:block">
+        {sidebar}
       </aside>
 
-      {isReady && sidebarOpen && isMobile ? (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+      {mobileOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-[#fff0f7] pt-20 shadow-2xl lg:hidden">
+            {sidebar}
+          </aside>
+        </>
       ) : null}
 
-      <div
-        className={`flex min-h-screen flex-col transition-all duration-300 ${
-          isMobile ? '' : desktopSidebarWidth
-        }`}
-      >
-        <header className="flex items-center justify-between bg-white px-4 py-3 shadow lg:hidden">
-          <button
-            onClick={() => setSidebarOpen((prev) => !prev)}
-            className="text-2xl"
-          >
-            <span className="sr-only">Toggle menu</span>
-            {sidebarOpen ? <RiDoorOpenLine /> : <RiDoorClosedLine />}
-          </button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-950 text-sm font-semibold text-white">
-            WN
-          </div>
-        </header>
-
-        <div>{children}</div>
-      </div>
+      <div className="min-h-screen pt-20 lg:pl-64">{children}</div>
     </div>
   );
 }
