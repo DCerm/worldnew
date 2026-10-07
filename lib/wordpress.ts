@@ -99,6 +99,9 @@ export type WordPressMusicProduct = {
   community_playback_mode?: "preview" | "full" | "members_full";
   community_category?: "movies" | "reels" | "mixtapes" | "behind-the-scenes";
   poster_image_url?: string | null;
+  portrait_poster_url?: string | null;
+  landscape_poster_url?: string | null;
+  poster_display?: "portrait" | "landscape";
   status: string;
   published_at?: string | null;
   product_url: string;
@@ -1408,6 +1411,7 @@ export async function getProductCheckoutRedirectUrl(
   options?: {
     returnTo?: string | null;
     useCommunityPrice?: boolean;
+    checkoutAction?: "cart" | "checkout";
   }
 ) {
   const checkoutSessionUrl = getWordPressCheckoutSessionUrl();
@@ -1430,6 +1434,7 @@ export async function getProductCheckoutRedirectUrl(
     variation_id: null,
     return_to: options?.returnTo ?? "/media/audio",
     use_community_price: options?.useCommunityPrice ?? true,
+    checkout_action: options?.checkoutAction ?? "checkout",
   };
 
   const result = await postSignedWordPressJson<{

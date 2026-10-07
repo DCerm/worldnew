@@ -60,7 +60,21 @@ export async function GET(request: NextRequest) {
     playback_url: string | null;
     media_type: "audio" | "video";
   }[]>`
-    select playback_url, media_type
+    select
+      coalesce(
+        nullif(playback_url, ''),
+        nullif(download_url, ''),
+        case
+          when storage_key ~* '^https?://' then storage_key
+          when storage_key like '/%' then storage_key
+          when storage_key like 'uploads/%' then '/' || storage_key
+          when nullif(storage_key, '') is not null
+            and lower(coalesce(storage_provider, 'local')) in ('local', 'filesystem', 'disk')
+            then '/uploads/' || storage_key
+          else null
+        end
+      ) as playback_url,
+      media_type
     from media_items
     where id = ${mediaId}
       and status = 'published'

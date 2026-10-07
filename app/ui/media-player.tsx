@@ -7,6 +7,10 @@ import {
   RiLoader4Line,
   RiPauseFill,
   RiPlayFill,
+  RiRepeatLine,
+  RiShuffleLine,
+  RiSkipBackFill,
+  RiSkipForwardFill,
   RiVolumeMuteLine,
   RiVolumeUpLine,
 } from "react-icons/ri";
@@ -29,6 +33,11 @@ type SleekAudioPlayerProps = {
   previewLimitSeconds?: number;
   previewStartSeconds?: number;
   previewEndSeconds?: number;
+  variant?: "compact" | "playerBar";
+  onPrevious?: () => void;
+  onNext?: () => void;
+  onShuffle?: () => void;
+  onEnded?: () => void;
 };
 
 export function SleekAudioPlayer({
@@ -38,6 +47,11 @@ export function SleekAudioPlayer({
   previewLimitSeconds,
   previewStartSeconds = 0,
   previewEndSeconds,
+  variant = "compact",
+  onPrevious,
+  onNext,
+  onShuffle,
+  onEnded,
 }: SleekAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -47,6 +61,7 @@ export function SleekAudioPlayer({
   const [shouldLoadSource, setShouldLoadSource] = useState(autoPlay);
   const [requestedPlay, setRequestedPlay] = useState(autoPlay);
   const [isLoading, setIsLoading] = useState(autoPlay);
+  const [isRepeating, setIsRepeating] = useState(false);
   const previewStart = Math.max(0, Math.floor(previewStartSeconds || 0));
   const effectivePreviewEnd =
     previewLimitSeconds && previewLimitSeconds > 0
@@ -84,8 +99,15 @@ export function SleekAudioPlayer({
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => {
+      if (isRepeating) {
+        audio.currentTime = previewStart;
+        void audio.play().catch(() => undefined);
+        return;
+      }
+
       setIsPlaying(false);
       setRequestedPlay(false);
+      onEnded?.();
     };
     const handleCanPlay = async () => {
       setIsLoading(false);
@@ -140,7 +162,7 @@ export function SleekAudioPlayer({
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("error", handleError);
     };
-  }, [effectivePreviewEnd, previewStart, requestedPlay, shouldLoadSource]);
+  }, [effectivePreviewEnd, isRepeating, onEnded, previewStart, requestedPlay, shouldLoadSource]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -233,7 +255,11 @@ export function SleekAudioPlayer({
 
   return (
     <div
-      className={`relative rounded-xl border border-[#F839A9]/30 bg-gradient-to-b from-stone-900 to-black p-3 shadow-[0_20px_40px_-30px_rgba(248,57,169,0.9)] ${className}`}
+      className={`relative ${
+        variant === "playerBar"
+          ? "bg-transparent"
+          : "rounded-xl border border-[#F839A9]/30 bg-gradient-to-b from-stone-900 to-black p-3 shadow-[0_20px_40px_-30px_rgba(248,57,169,0.9)]"
+      } ${className}`}
       onContextMenu={(event) => event.preventDefault()}
     >
       <audio
@@ -243,7 +269,7 @@ export function SleekAudioPlayer({
       />
 
       {isLoading && shouldLoadSource && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/45">
+        <div className={`pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl ${variant === "playerBar" ? "bg-white/65" : "bg-black/45"}`}>
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3 py-2 text-xs text-white shadow-lg">
             <RiLoader4Line className="animate-spin text-base text-[#F839A9]" />
             Buffering audio...
@@ -251,6 +277,97 @@ export function SleekAudioPlayer({
         </div>
       )}
 
+      {variant === "playerBar" ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-center gap-2 sm:gap-4">
+            <button
+              type="button"
+              onClick={onShuffle}
+              disabled={!onShuffle}
+              className="grid h-8 w-8 place-items-center rounded-full text-lg text-stone-500 transition hover:text-[#F839A9] disabled:opacity-35"
+              aria-label="Shuffle tracks"
+              title="Shuffle"
+            >
+              <RiShuffleLine />
+            </button>
+            <button
+              type="button"
+              onClick={onPrevious}
+              disabled={!onPrevious}
+              className="grid h-9 w-9 place-items-center rounded-full text-xl text-stone-900 transition hover:text-[#F839A9] disabled:opacity-35"
+              aria-label="Previous track"
+              title="Previous"
+            >
+              <RiSkipBackFill />
+            </button>
+            <button
+              type="button"
+              onClick={togglePlay}
+              className="grid h-12 w-12 place-items-center rounded-full bg-[#F839A9] text-2xl text-white shadow-[0_12px_28px_-12px_rgba(248,57,169,.9)] transition hover:scale-105"
+              aria-label={isPlaying ? "Pause audio" : "Play audio"}
+              title={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <RiPauseFill /> : <RiPlayFill />}
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={!onNext}
+              className="grid h-9 w-9 place-items-center rounded-full text-xl text-stone-900 transition hover:text-[#F839A9] disabled:opacity-35"
+              aria-label="Next track"
+              title="Next"
+            >
+              <RiSkipForwardFill />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsRepeating((current) => !current)}
+              className={`grid h-8 w-8 place-items-center rounded-full text-lg transition ${isRepeating ? "bg-[#ffe4f4] text-[#F839A9]" : "text-stone-500 hover:text-[#F839A9]"}`}
+              aria-label={isRepeating ? "Disable repeat" : "Repeat track"}
+              aria-pressed={isRepeating}
+              title={isRepeating ? "Repeat on" : "Repeat"}
+            >
+              <RiRepeatLine />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-[42px_minmax(80px,1fr)_42px_auto] items-center gap-2">
+            <span className="text-right text-[11px] font-semibold tabular-nums text-stone-500">
+              {formatTime(displayedCurrentTime)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={progressMax}
+              step={0.1}
+              value={Math.min(displayedCurrentTime, progressMax)}
+              onChange={(event) => {
+                const audio = audioRef.current;
+                if (!audio) return;
+                const nextTime = Number(event.target.value) || 0;
+                const absoluteTime = effectivePreviewEnd ? previewStart + nextTime : nextTime;
+                audio.currentTime = absoluteTime;
+                setCurrentTime(absoluteTime);
+              }}
+              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#f6bedc] accent-[#F839A9]"
+              aria-label="Track position"
+            />
+            <span className="text-[11px] font-semibold tabular-nums text-stone-500">
+              {formatTime(progressMax)}
+            </span>
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="grid h-8 w-8 place-items-center rounded-full text-lg text-stone-600 transition hover:text-[#F839A9]"
+              aria-label={isMuted ? "Unmute audio" : "Mute audio"}
+              title={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? <RiVolumeMuteLine /> : <RiVolumeUpLine />}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -293,6 +410,8 @@ export function SleekAudioPlayer({
         }}
         className="mt-3 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-stone-700 accent-[#F839A9]"
       />
+        </>
+      )}
     </div>
   );
 }

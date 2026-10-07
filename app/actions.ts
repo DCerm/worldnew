@@ -1714,10 +1714,15 @@ export async function createMediaAction(formData: FormData): Promise<ActionOutco
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   const playbackUrlInput = String(formData.get("playbackUrl") ?? "").trim();
   const mediaFile = formData.get("mediaFile");
-  const posterFile = formData.get("posterFile");
+  const portraitPosterFile = formData.get("portraitPosterFile");
+  const landscapePosterFile = formData.get("landscapePosterFile");
+  const legacyPosterFile = formData.get("posterFile");
   const uploadedPlaybackPath = String(formData.get("uploadedPlaybackPath") ?? "").trim();
-  const uploadedPosterPath = String(formData.get("uploadedPosterPath") ?? "").trim();
-  const posterImageUrl = String(formData.get("posterImageUrl") ?? "").trim();
+  const uploadedPortraitPosterPath = String(formData.get("uploadedPortraitPosterPath") ?? "").trim();
+  const uploadedLandscapePosterPath = String(formData.get("uploadedLandscapePosterPath") ?? "").trim();
+  const portraitPosterUrlInput = String(formData.get("portraitPosterUrl") ?? "").trim();
+  const landscapePosterUrlInput = String(formData.get("landscapePosterUrl") ?? formData.get("posterImageUrl") ?? "").trim();
+  const posterDisplay = String(formData.get("posterDisplay") ?? "landscape") === "portrait" ? "portrait" : "landscape";
   const planCode = String(formData.get("planCode") ?? "").trim();
   const tags = String(formData.get("tags") ?? "")
     .split(",")
@@ -1736,10 +1741,19 @@ export async function createMediaAction(formData: FormData): Promise<ActionOutco
   const mediaId = randomUUID();
   const uploadedPlaybackUrl =
     uploadedPlaybackPath || (await saveUploadedMediaFile(mediaId, mediaType, mediaFile)) || "";
-  const uploadedPosterUrl =
-    uploadedPosterPath || (await saveUploadedPosterFile(mediaId, posterFile)) || "";
+  const uploadedPortraitPosterUrl =
+    uploadedPortraitPosterPath || (await saveUploadedPosterFile(`${mediaId}-portrait`, portraitPosterFile)) || "";
+  const uploadedLandscapePosterUrl =
+    uploadedLandscapePosterPath ||
+    (await saveUploadedPosterFile(`${mediaId}-landscape`, landscapePosterFile)) ||
+    (await saveUploadedPosterFile(`${mediaId}-poster`, legacyPosterFile)) ||
+    "";
   const playbackUrl = playbackUrlInput || uploadedPlaybackUrl || "";
-  const nextPosterImageUrl = uploadedPosterUrl || posterImageUrl || null;
+  const portraitPosterUrl = uploadedPortraitPosterUrl || portraitPosterUrlInput || null;
+  const landscapePosterUrl = uploadedLandscapePosterUrl || landscapePosterUrlInput || null;
+  const nextPosterImageUrl = posterDisplay === "portrait"
+    ? portraitPosterUrl || landscapePosterUrl
+    : landscapePosterUrl || portraitPosterUrl;
 
   if (!playbackUrl) {
     await setToast("Add a media file or playback URL.", "error");
@@ -1805,7 +1819,10 @@ export async function createMediaAction(formData: FormData): Promise<ActionOutco
           jsonb_build_object(
             'is_featured', ${isFeatured}::boolean,
             'featured_artists', ${featuredArtists || null}::text,
-            'preview_seconds', ${previewSeconds}::int
+            'preview_seconds', ${previewSeconds}::int,
+            'portrait_poster_url', ${portraitPosterUrl}::text,
+            'landscape_poster_url', ${landscapePosterUrl}::text,
+            'poster_display', ${posterDisplay}::text
           ),
           'published',
           now()
@@ -1865,10 +1882,15 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   const playbackUrlInput = String(formData.get("playbackUrl") ?? "").trim();
   const mediaFile = formData.get("mediaFile");
-  const posterFile = formData.get("posterFile");
+  const portraitPosterFile = formData.get("portraitPosterFile");
+  const landscapePosterFile = formData.get("landscapePosterFile");
+  const legacyPosterFile = formData.get("posterFile");
   const uploadedPlaybackPath = String(formData.get("uploadedPlaybackPath") ?? "").trim();
-  const uploadedPosterPath = String(formData.get("uploadedPosterPath") ?? "").trim();
-  const posterImageUrl = String(formData.get("posterImageUrl") ?? "").trim();
+  const uploadedPortraitPosterPath = String(formData.get("uploadedPortraitPosterPath") ?? "").trim();
+  const uploadedLandscapePosterPath = String(formData.get("uploadedLandscapePosterPath") ?? "").trim();
+  const portraitPosterUrlInput = String(formData.get("portraitPosterUrl") ?? "").trim();
+  const landscapePosterUrlInput = String(formData.get("landscapePosterUrl") ?? formData.get("posterImageUrl") ?? "").trim();
+  const posterDisplay = String(formData.get("posterDisplay") ?? "landscape") === "portrait" ? "portrait" : "landscape";
   const planCode = String(formData.get("planCode") ?? "").trim();
   const tags = String(formData.get("tags") ?? "")
     .split(",")
@@ -1885,16 +1907,27 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
 
   const uploadedPlaybackUrl =
     uploadedPlaybackPath || (await saveUploadedMediaFile(mediaId, mediaType, mediaFile)) || "";
-  const uploadedPosterUrl =
-    uploadedPosterPath || (await saveUploadedPosterFile(mediaId, posterFile)) || "";
+  const uploadedPortraitPosterUrl =
+    uploadedPortraitPosterPath || (await saveUploadedPosterFile(`${mediaId}-portrait`, portraitPosterFile)) || "";
+  const uploadedLandscapePosterUrl =
+    uploadedLandscapePosterPath ||
+    (await saveUploadedPosterFile(`${mediaId}-landscape`, landscapePosterFile)) ||
+    (await saveUploadedPosterFile(`${mediaId}-poster`, legacyPosterFile)) ||
+    "";
 
   try {
     await sql.begin(async (tx) => {
       const existingRows = await tx<{
         playback_url: string | null;
         poster_image_url: string | null;
+        portrait_poster_url: string | null;
+        landscape_poster_url: string | null;
       }[]>`
-        select playback_url, poster_image_url
+        select
+          playback_url,
+          poster_image_url,
+          nullif(metadata->>'portrait_poster_url', '') as portrait_poster_url,
+          coalesce(nullif(metadata->>'landscape_poster_url', ''), poster_image_url) as landscape_poster_url
         from media_items
         where id = ${mediaId}
         limit 1
@@ -1917,8 +1950,13 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
         throw new Error("invalid_playback_url");
       }
 
-      const nextPosterImageUrl =
-        uploadedPosterUrl || posterImageUrl || existing.poster_image_url;
+      const portraitPosterUrl =
+        uploadedPortraitPosterUrl || portraitPosterUrlInput || existing.portrait_poster_url;
+      const landscapePosterUrl =
+        uploadedLandscapePosterUrl || landscapePosterUrlInput || existing.landscape_poster_url;
+      const nextPosterImageUrl = posterDisplay === "portrait"
+        ? portraitPosterUrl || landscapePosterUrl || existing.poster_image_url
+        : landscapePosterUrl || portraitPosterUrl || existing.poster_image_url;
       if (isFeatured) {
         await tx`
           update media_items
@@ -1950,7 +1988,10 @@ export async function updateMediaAction(formData: FormData): Promise<ActionOutco
           metadata = jsonb_build_object(
             'is_featured', ${isFeatured}::boolean,
             'featured_artists', ${featuredArtists || null}::text,
-            'preview_seconds', ${previewSeconds}::int
+            'preview_seconds', ${previewSeconds}::int,
+            'portrait_poster_url', ${portraitPosterUrl}::text,
+            'landscape_poster_url', ${landscapePosterUrl}::text,
+            'poster_display', ${posterDisplay}::text
           ),
           updated_at = now()
         where id = ${mediaId}
@@ -2189,15 +2230,23 @@ export async function deleteMediaPermanentlyAction(
 
   let playbackUrl: string | null = null;
   let posterImageUrl: string | null = null;
+  let portraitPosterUrl: string | null = null;
+  let landscapePosterUrl: string | null = null;
 
   try {
     const deletedRows = await sql<{
       playback_url: string | null;
       poster_image_url: string | null;
+      portrait_poster_url: string | null;
+      landscape_poster_url: string | null;
     }[]>`
       delete from media_items
       where id = ${mediaId}
-      returning playback_url, poster_image_url
+      returning
+        playback_url,
+        poster_image_url,
+        nullif(metadata->>'portrait_poster_url', '') as portrait_poster_url,
+        nullif(metadata->>'landscape_poster_url', '') as landscape_poster_url
     `;
 
     const deleted = deletedRows[0];
@@ -2208,6 +2257,8 @@ export async function deleteMediaPermanentlyAction(
 
     playbackUrl = deleted.playback_url;
     posterImageUrl = deleted.poster_image_url;
+    portraitPosterUrl = deleted.portrait_poster_url;
+    landscapePosterUrl = deleted.landscape_poster_url;
   } catch (error) {
     if (error instanceof Error && error.message === "missing_media_item") {
       await setToast("Could not find that media item.", "error");
@@ -2229,10 +2280,14 @@ export async function deleteMediaPermanentlyAction(
 
   const localPlaybackPath = resolveLocalUploadPath(playbackUrl);
   const localPosterPath = resolveLocalUploadPath(posterImageUrl);
+  const localPortraitPosterPath = resolveLocalUploadPath(portraitPosterUrl);
+  const localLandscapePosterPath = resolveLocalUploadPath(landscapePosterUrl);
 
   await Promise.all([
     localPlaybackPath ? rm(localPlaybackPath, { force: true }).catch(() => undefined) : null,
     localPosterPath ? rm(localPosterPath, { force: true }).catch(() => undefined) : null,
+    localPortraitPosterPath ? rm(localPortraitPosterPath, { force: true }).catch(() => undefined) : null,
+    localLandscapePosterPath ? rm(localLandscapePosterPath, { force: true }).catch(() => undefined) : null,
   ]);
 
   revalidatePath("/");

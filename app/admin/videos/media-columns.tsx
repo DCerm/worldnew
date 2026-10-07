@@ -38,6 +38,15 @@ type UploadProgressState = {
   message: string;
 };
 
+type UploadFileEntry = {
+  file: File;
+  kind: "playback" | "poster";
+  mediaType: "video";
+  inputField: string;
+  outputField: string;
+  label: string;
+};
+
 const IDLE_UPLOAD_STATE: UploadProgressState = {
   stage: "idle",
   progress: 0,
@@ -149,7 +158,7 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
   }
 
   function getOverallUploadProgress(
-    files: { file: File; kind: "playback" | "poster"; mediaType: "video" }[],
+    files: UploadFileEntry[],
     currentIndex: number,
     currentLoaded: number
   ) {
@@ -227,15 +236,20 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
   ) {
     const mediaType = "video";
     const mediaFile = formData.get("mediaFile");
-    const posterFile = formData.get("posterFile");
-    const files: { file: File; kind: "playback" | "poster"; mediaType: "video" }[] = [];
+    const portraitPosterFile = formData.get("portraitPosterFile");
+    const landscapePosterFile = formData.get("landscapePosterFile");
+    const files: UploadFileEntry[] = [];
 
     if (mediaFile instanceof File && mediaFile.size > 0) {
-      files.push({ file: mediaFile, kind: "playback", mediaType });
+      files.push({ file: mediaFile, kind: "playback", mediaType, inputField: "mediaFile", outputField: "uploadedPlaybackPath", label: "media file" });
     }
 
-    if (posterFile instanceof File && posterFile.size > 0) {
-      files.push({ file: posterFile, kind: "poster", mediaType });
+    if (portraitPosterFile instanceof File && portraitPosterFile.size > 0) {
+      files.push({ file: portraitPosterFile, kind: "poster", mediaType, inputField: "portraitPosterFile", outputField: "uploadedPortraitPosterPath", label: "portrait poster" });
+    }
+
+    if (landscapePosterFile instanceof File && landscapePosterFile.size > 0) {
+      files.push({ file: landscapePosterFile, kind: "poster", mediaType, inputField: "landscapePosterFile", outputField: "uploadedLandscapePosterPath", label: "landscape poster" });
     }
 
     if (files.length === 0) {
@@ -246,35 +260,33 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
       stage: "uploading",
       progress: 1,
       message:
-        files.length > 1 ? "Uploading media and artwork..." : "Uploading media file...",
+        files.length > 1 ? "Uploading media and artwork..." : `Uploading ${files[0].label}...`,
     });
 
     for (const [index, entry] of files.entries()) {
       const storedPath = await uploadFile(entry.file, {
         kind: entry.kind,
         mediaType: entry.mediaType,
-        uploadId: `${uploadId}-${entry.kind}`,
+        uploadId: `${uploadId}-${entry.outputField}`,
         onProgress: (loadedBytes) => {
           setUploadState({
             stage: "uploading",
             progress: getOverallUploadProgress(files, index, loadedBytes),
             message:
               entry.kind === "poster"
-                ? "Uploading poster artwork..."
+                ? `Uploading ${entry.label}...`
                 : "Uploading media file...",
           });
         },
       });
 
-      if (entry.kind === "playback") {
-        formData.set("uploadedPlaybackPath", storedPath);
-      } else {
-        formData.set("uploadedPosterPath", storedPath);
-      }
+      formData.set(entry.outputField, storedPath);
+      formData.delete(entry.inputField);
     }
 
     formData.delete("mediaFile");
-    formData.delete("posterFile");
+    formData.delete("portraitPosterFile");
+    formData.delete("landscapePosterFile");
   }
 
   async function handleCreateMedia(formData: FormData) {
@@ -666,17 +678,14 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                   className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                 />
               </FieldShell>
-              <FieldShell
-                label="Upload poster image"
-                hint="Optional cover image for cards and video posters."
-              >
-                <input
-                  name="posterFile"
-                  type="file"
-                  accept="image/*"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-                />
-              </FieldShell>
+              <div className="grid gap-3 md:grid-cols-2">
+                <FieldShell label="Portrait poster" hint="Upload vertical artwork, ideally 2:3 or 9:16.">
+                  <input name="portraitPosterFile" type="file" accept="image/*" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+                <FieldShell label="Landscape poster" hint="Upload wide artwork, ideally 16:9.">
+                  <input name="landscapePosterFile" type="file" accept="image/*" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+              </div>
               <FieldShell
                 label="Playback URL"
                 hint="Use this if the file lives on external storage. If you upload a file above, this can stay empty."
@@ -687,15 +696,19 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                   className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                 />
               </FieldShell>
-              <FieldShell
-                label="Poster image URL"
-                hint="Optional external image URL. The uploaded poster above takes priority."
-              >
-                <input
-                  name="posterImageUrl"
-                  placeholder="Poster image URL (optional)"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-                />
+              <div className="grid gap-3 md:grid-cols-2">
+                <FieldShell label="Portrait poster URL" hint="Optional when no portrait file is uploaded.">
+                  <input name="portraitPosterUrl" placeholder="https://..." className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+                <FieldShell label="Landscape poster URL" hint="Optional when no landscape file is uploaded.">
+                  <input name="landscapePosterUrl" placeholder="https://..." className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+              </div>
+              <FieldShell label="Poster shown on the frontend" hint="Choose which artwork appears on cards, featured media, and video players.">
+                <select name="posterDisplay" defaultValue="landscape" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm">
+                  <option value="landscape">Landscape poster</option>
+                  <option value="portrait">Portrait poster</option>
+                </select>
               </FieldShell>
               <div className="grid gap-2 md:grid-cols-2">
                 <FieldShell
@@ -867,14 +880,14 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                   className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                 />
               </FieldShell>
-              <FieldShell label="Replace poster image" hint="Leave empty to keep the current artwork.">
-                <input
-                  name="posterFile"
-                  type="file"
-                  accept="image/*"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-                />
-              </FieldShell>
+              <div className="grid gap-3 md:grid-cols-2">
+                <FieldShell label="Replace portrait poster" hint="Leave empty to keep the current portrait artwork.">
+                  <input name="portraitPosterFile" type="file" accept="image/*" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+                <FieldShell label="Replace landscape poster" hint="Leave empty to keep the current landscape artwork.">
+                  <input name="landscapePosterFile" type="file" accept="image/*" className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+              </div>
               <FieldShell label="Playback URL" hint="Paste a hosted media URL if this release should stream from external storage.">
                 <input
                   name="playbackUrl"
@@ -883,13 +896,19 @@ export default function MediaColumns({ mediaItems, categories, plans }: Props) {
                   className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                 />
               </FieldShell>
-              <FieldShell label="Poster image URL" hint="Optional external image URL for the media card and poster.">
-                <input
-                  name="posterImageUrl"
-                  defaultValue={editingItem.posterImageUrl ?? ""}
-                  placeholder="Poster image URL"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
-                />
+              <div className="grid gap-3 md:grid-cols-2">
+                <FieldShell label="Portrait poster URL" hint="The uploaded portrait file takes priority when supplied.">
+                  <input name="portraitPosterUrl" defaultValue={editingItem.portraitPosterUrl ?? ""} placeholder="https://..." className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+                <FieldShell label="Landscape poster URL" hint="Existing single posters are retained here automatically.">
+                  <input name="landscapePosterUrl" defaultValue={editingItem.landscapePosterUrl ?? editingItem.posterImageUrl ?? ""} placeholder="https://..." className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" />
+                </FieldShell>
+              </div>
+              <FieldShell label="Poster shown on the frontend" hint="Choose which artwork appears on cards, featured media, and video players.">
+                <select name="posterDisplay" defaultValue={editingItem.posterDisplay} className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm">
+                  <option value="landscape">Landscape poster</option>
+                  <option value="portrait">Portrait poster</option>
+                </select>
               </FieldShell>
               <div className="grid gap-2 md:grid-cols-2">
                 <FieldShell label="Featured artists" hint="List collaborators or guest appearances.">

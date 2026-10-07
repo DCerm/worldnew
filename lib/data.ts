@@ -40,6 +40,9 @@ export type MediaCard = {
   playbackUrl: string | null;
   rawPlaybackUrl: string | null;
   posterImageUrl: string | null;
+  portraitPosterUrl: string | null;
+  landscapePosterUrl: string | null;
+  posterDisplay: "portrait" | "landscape";
   createdAt: string;
   planCodes: string[];
   tags: string[];
@@ -68,6 +71,12 @@ function wordpressVideoProductToMediaCard(product: WordPressMusicProduct): Media
 
   const categorySlug = product.community_category ?? "behind-the-scenes";
   const playbackMode = product.community_playback_mode === "members_full" ? "members_full" : "full";
+  const portraitPosterUrl = product.portrait_poster_url || null;
+  const landscapePosterUrl = product.landscape_poster_url || product.poster_image_url || product.cover_image_url || null;
+  const posterDisplay = product.poster_display === "portrait" ? "portrait" : "landscape";
+  const selectedPosterUrl = posterDisplay === "portrait"
+    ? portraitPosterUrl || landscapePosterUrl
+    : landscapePosterUrl || portraitPosterUrl;
 
   return {
     id: `wp-video-${product.id}`,
@@ -79,7 +88,10 @@ function wordpressVideoProductToMediaCard(product: WordPressMusicProduct): Media
     categorySlug,
     playbackUrl: product.stream_url,
     rawPlaybackUrl: product.stream_url,
-    posterImageUrl: product.poster_image_url || product.cover_image_url || null,
+    posterImageUrl: selectedPosterUrl,
+    portraitPosterUrl,
+    landscapePosterUrl,
+    posterDisplay,
     createdAt: new Date().toISOString(),
     planCodes: [],
     tags: product.category_slugs ?? [],
@@ -113,6 +125,9 @@ function wordpressAudioProductToMediaCard(product: WordPressMusicProduct): Media
     playbackUrl: product.stream_url,
     rawPlaybackUrl: product.stream_url,
     posterImageUrl: product.cover_image_url || null,
+    portraitPosterUrl: null,
+    landscapePosterUrl: product.cover_image_url || null,
+    posterDisplay: "landscape",
     createdAt: product.published_at ?? new Date().toISOString(),
     planCodes: [],
     tags: product.category_slugs ?? [],
@@ -488,6 +503,9 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
       category_slug: string | null;
       playback_url: string | null;
       poster_image_url: string | null;
+      portrait_poster_url: string | null;
+      landscape_poster_url: string | null;
+      poster_display: "portrait" | "landscape";
       created_at: string;
       plan_codes: string[] | null;
       tags: string[] | null;
@@ -516,8 +534,27 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
         m.visibility,
         c.name as category_name,
         c.slug as category_slug,
-        m.playback_url,
-        m.poster_image_url,
+        coalesce(
+          nullif(m.playback_url, ''),
+          nullif(m.download_url, ''),
+          case
+            when m.storage_key ~* '^https?://' then m.storage_key
+            when m.storage_key like '/%' then m.storage_key
+            when m.storage_key like 'uploads/%' then '/' || m.storage_key
+            when nullif(m.storage_key, '') is not null
+              and lower(coalesce(m.storage_provider, 'local')) in ('local', 'filesystem', 'disk')
+              then '/uploads/' || m.storage_key
+            else null
+          end
+        ) as playback_url,
+        case
+          when lower(coalesce(m.metadata->>'poster_display', 'landscape')) = 'portrait'
+            then coalesce(nullif(m.metadata->>'portrait_poster_url', ''), nullif(m.metadata->>'landscape_poster_url', ''), nullif(m.poster_image_url, ''), nullif(m.thumbnail_url, ''))
+          else coalesce(nullif(m.metadata->>'landscape_poster_url', ''), nullif(m.poster_image_url, ''), nullif(m.metadata->>'portrait_poster_url', ''), nullif(m.thumbnail_url, ''))
+        end as poster_image_url,
+        nullif(m.metadata->>'portrait_poster_url', '') as portrait_poster_url,
+        coalesce(nullif(m.metadata->>'landscape_poster_url', ''), nullif(m.poster_image_url, ''), nullif(m.thumbnail_url, '')) as landscape_poster_url,
+        case when lower(coalesce(m.metadata->>'poster_display', 'landscape')) = 'portrait' then 'portrait' else 'landscape' end as poster_display,
         m.created_at::text,
         coalesce(array_agg(distinct mp.code::text) filter (where mp.code is not null), '{}'::text[]) as plan_codes,
         case
@@ -554,7 +591,11 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
         c.name,
         c.slug,
         m.playback_url,
+        m.download_url,
+        m.storage_provider,
+        m.storage_key,
         m.poster_image_url,
+        m.thumbnail_url,
         m.created_at,
         m.tags,
         m.metadata
@@ -574,6 +615,9 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
         : null,
       rawPlaybackUrl: row.playback_url,
       posterImageUrl: resolvePublicMediaAssetUrl(row.poster_image_url),
+      portraitPosterUrl: resolvePublicMediaAssetUrl(row.portrait_poster_url),
+      landscapePosterUrl: resolvePublicMediaAssetUrl(row.landscape_poster_url),
+      posterDisplay: row.poster_display,
       createdAt: row.created_at,
       planCodes: row.plan_codes ?? [],
       tags: row.tags ?? [],
@@ -621,6 +665,9 @@ export async function getMediaItemById(mediaId: string): Promise<MediaCard | nul
       category_slug: string | null;
       playback_url: string | null;
       poster_image_url: string | null;
+      portrait_poster_url: string | null;
+      landscape_poster_url: string | null;
+      poster_display: "portrait" | "landscape";
       created_at: string;
       plan_codes: string[] | null;
       tags: string[] | null;
@@ -637,8 +684,27 @@ export async function getMediaItemById(mediaId: string): Promise<MediaCard | nul
         m.visibility,
         c.name as category_name,
         c.slug as category_slug,
-        m.playback_url,
-        m.poster_image_url,
+        coalesce(
+          nullif(m.playback_url, ''),
+          nullif(m.download_url, ''),
+          case
+            when m.storage_key ~* '^https?://' then m.storage_key
+            when m.storage_key like '/%' then m.storage_key
+            when m.storage_key like 'uploads/%' then '/' || m.storage_key
+            when nullif(m.storage_key, '') is not null
+              and lower(coalesce(m.storage_provider, 'local')) in ('local', 'filesystem', 'disk')
+              then '/uploads/' || m.storage_key
+            else null
+          end
+        ) as playback_url,
+        case
+          when lower(coalesce(m.metadata->>'poster_display', 'landscape')) = 'portrait'
+            then coalesce(nullif(m.metadata->>'portrait_poster_url', ''), nullif(m.metadata->>'landscape_poster_url', ''), nullif(m.poster_image_url, ''), nullif(m.thumbnail_url, ''))
+          else coalesce(nullif(m.metadata->>'landscape_poster_url', ''), nullif(m.poster_image_url, ''), nullif(m.metadata->>'portrait_poster_url', ''), nullif(m.thumbnail_url, ''))
+        end as poster_image_url,
+        nullif(m.metadata->>'portrait_poster_url', '') as portrait_poster_url,
+        coalesce(nullif(m.metadata->>'landscape_poster_url', ''), nullif(m.poster_image_url, ''), nullif(m.thumbnail_url, '')) as landscape_poster_url,
+        case when lower(coalesce(m.metadata->>'poster_display', 'landscape')) = 'portrait' then 'portrait' else 'landscape' end as poster_display,
         m.created_at::text,
         coalesce(array_agg(distinct mp.code::text) filter (where mp.code is not null), '{}'::text[]) as plan_codes,
         case
@@ -690,6 +756,9 @@ export async function getMediaItemById(mediaId: string): Promise<MediaCard | nul
         : null,
       rawPlaybackUrl: row.playback_url,
       posterImageUrl: resolvePublicMediaAssetUrl(row.poster_image_url),
+      portraitPosterUrl: resolvePublicMediaAssetUrl(row.portrait_poster_url),
+      landscapePosterUrl: resolvePublicMediaAssetUrl(row.landscape_poster_url),
+      posterDisplay: row.poster_display,
       createdAt: row.created_at,
       planCodes: row.plan_codes ?? [],
       tags: row.tags ?? [],

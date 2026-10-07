@@ -36,14 +36,13 @@ export default async function MediaCategoryPage({
     redirect("/media/audio");
   }
 
-  const isKnownCategory = MEDIA_CATEGORIES.some((category) => category.slug === normalizedSlug);
-
-  if (!isKnownCategory) {
-    notFound();
-  }
-
   const [user, media] = await Promise.all([getCurrentUser(), getMediaLibrary()]);
   const categoryMedia = mediaForCategory(media, normalizedSlug);
+  const isHighlightedCategory = MEDIA_CATEGORIES.some((category) => category.slug === normalizedSlug);
+
+  if (!isHighlightedCategory && categoryMedia.length === 0) {
+    notFound();
+  }
   const totalPages = Math.max(1, Math.ceil(categoryMedia.length / PAGE_SIZE));
   const requestedPage = Number.parseInt(resolvedSearchParams.page ?? "1", 10);
   const currentPage = Math.min(Math.max(Number.isFinite(requestedPage) ? requestedPage : 1, 1), totalPages);

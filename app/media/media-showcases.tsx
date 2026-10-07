@@ -7,7 +7,7 @@ import { RiArrowLeftSLine, RiArrowRightSLine, RiInformationLine, RiPlayFill } fr
 import { SleekAudioPlayer, SleekVideoPlayer } from "@/app/ui/media-player";
 import type { AuthUser } from "@/lib/auth";
 import type { MediaCard } from "@/lib/data";
-import { MEDIA_CATEGORIES, categoryHrefForSlug, mediaForCategory } from "@/lib/media-categories";
+import { MEDIA_CATEGORIES, categoryHrefForSlug, categoryLabelForSlug, mediaForCategory } from "@/lib/media-categories";
 
 function canAccessMediaClient(user: AuthUser | null, media: MediaCard) {
   if (media.visibility === "public") return true;
@@ -296,14 +296,33 @@ export function MediaCategoryShelves({
   user: AuthUser | null;
   onInfo?: (id: string) => void;
 }) {
-  const shelves = useMemo(
-    () =>
-      MEDIA_CATEGORIES.filter((category) => category.slug !== "music").map((category) => ({
+  const shelves = useMemo(() => {
+    const highlightedCategories = MEDIA_CATEGORIES.filter((category) => category.slug !== "music");
+    const highlightedSlugs = new Set<string>(highlightedCategories.map((category) => category.slug));
+    const discoveredCategories = new Map<string, string>();
+
+    media.forEach((item) => {
+      const slug = item.categorySlug?.trim();
+
+      if (!slug || slug === "music" || highlightedSlugs.has(slug)) {
+        return;
+      }
+
+      if (!discoveredCategories.has(slug)) {
+        discoveredCategories.set(slug, item.categoryName?.trim() || categoryLabelForSlug(slug));
+      }
+    });
+
+    return [
+      ...highlightedCategories,
+      ...Array.from(discoveredCategories, ([slug, label]) => ({ slug, label })),
+    ]
+      .map((category) => ({
         ...category,
         items: mediaForCategory(media, category.slug).slice(0, category.slug === "mixtapes" ? 10 : 12),
-      })).filter((category) => category.items.length > 0),
-    [media]
-  );
+      }))
+      .filter((category) => category.items.length > 0);
+  }, [media]);
 
   return (
     <div className="space-y-9">

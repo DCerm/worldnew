@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { RiPlayFill, RiSearchLine } from "react-icons/ri";
+import { FaHeart } from "react-icons/fa";
+import { RiCloseLine, RiPauseFill, RiPlayFill, RiSearchLine } from "react-icons/ri";
 
 import type { AuthUser } from "@/lib/auth";
 import type { MediaCard } from "@/lib/data";
@@ -11,7 +12,7 @@ import {
   MediaInfoDialog,
   MediaPoster,
 } from "@/app/media/media-showcases";
-import { SleekVideoPlayer } from "@/app/ui/media-player";
+import { SleekAudioPlayer, SleekVideoPlayer } from "@/app/ui/media-player";
 import { MEDIA_CATEGORIES, categoryHrefForSlug } from "@/lib/media-categories";
 
 type Props = {
@@ -20,9 +21,23 @@ type Props = {
   dashboardHref: string;
 };
 
-function TopSong({ item, index }: { item: MediaCard; index: number }) {
+function TopSong({
+  item,
+  index,
+  isActive,
+  onPlay,
+}: {
+  item: MediaCard;
+  index: number;
+  isActive: boolean;
+  onPlay: (item: MediaCard) => void;
+}) {
   return (
-    <Link href={`/media/watch/${item.id}`} className="grid grid-cols-[24px_66px_1fr_40px] items-center gap-3 rounded-2xl p-2 transition hover:bg-[#fff0f7]">
+    <button
+      type="button"
+      onClick={() => onPlay(item)}
+      className="grid w-full grid-cols-[24px_66px_1fr_40px] items-center gap-3 rounded-2xl p-2 text-left transition hover:bg-[#fff0f7]"
+    >
       <span className="text-sm font-black text-stone-950">{index + 1}</span>
       <MediaPoster item={item} fit="object-cover" className="h-16 w-16 rounded-xl" />
       <span className="min-w-0">
@@ -31,14 +46,29 @@ function TopSong({ item, index }: { item: MediaCard; index: number }) {
         <span className="block text-xs text-stone-500">0:{String(item.previewSeconds || 30).padStart(2, "0")}</span>
       </span>
       <span className="grid h-10 w-10 place-items-center rounded-full border border-stone-300 text-stone-950">
-        <RiPlayFill />
+        {isActive ? <RiPauseFill /> : <RiPlayFill />}
       </span>
-    </Link>
+    </button>
   );
+}
+
+function canOpenAudioPlayer(user: AuthUser | null, item: MediaCard) {
+  if (item.visibility === "public") return true;
+  if (!user) return false;
+  if (user.roles.includes("artist_admin") || user.roles.includes("super_admin")) return true;
+  if (item.communityPlaybackMode === "members_full") return true;
+  if (item.visibility === "community") return true;
+  if (item.visibility === "paid") return Boolean(user.activePlanCode);
+  if (item.visibility === "plan_specific") {
+    return Boolean(user.activePlanCode && item.planCodes.includes(user.activePlanCode));
+  }
+  return false;
 }
 
 export default function MediaExperience({ user, media, dashboardHref }: Props) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [activeAudio, setActiveAudio] = useState<MediaCard | null>(null);
+  const [audioPlayerOpen, setAudioPlayerOpen] = useState(false);
 
   const featuredItem = useMemo(() => {
     return media.find((item) => item.isFeatured && item.mediaType === "video")
@@ -49,6 +79,30 @@ export default function MediaExperience({ user, media, dashboardHref }: Props) {
 
   const audioItems = media.filter((item) => item.mediaType === "audio");
   const selectedItem = selectedItemId ? media.find((item) => item.id === selectedItemId) ?? null : null;
+  const audioIsLocked = activeAudio ? !canOpenAudioPlayer(user, activeAudio) : false;
+  const shouldLimitAudioToPreview = Boolean(
+    activeAudio &&
+      (activeAudio.communityPlaybackMode === "preview" ||
+        (activeAudio.communityPlaybackMode === "members_full" && !user?.activePlanCode))
+  );
+  const activeAudioSource = activeAudio
+    ? shouldLimitAudioToPreview
+      ? activeAudio.playbackUrl
+      : activeAudio.fullPlaybackUrl ?? activeAudio.playbackUrl
+    : null;
+  const activeAudioIndex = activeAudio ? audioItems.findIndex((item) => item.id === activeAudio.id) : -1;
+
+  const selectAudioAt = (index: number) => {
+    const item = audioItems[index];
+    if (!item) return;
+    setActiveAudio(item);
+    setAudioPlayerOpen(true);
+  };
+
+  const handleTopSongPlay = (item: MediaCard) => {
+    setActiveAudio(item);
+    setAudioPlayerOpen(true);
+  };
 
   return (
     <main className="wn-media-page min-h-screen bg-white text-stone-950">
@@ -149,7 +203,15 @@ export default function MediaExperience({ user, media, dashboardHref }: Props) {
             <Link href="/media/audio" className="text-sm font-black text-[#F839A9]">View all</Link>
           </div>
           <div className="space-y-3">
-            {audioItems.slice(0, 6).map((item, index) => <TopSong key={item.id} item={item} index={index} />)}
+            {audioItems.slice(0, 6).map((item, index) => (
+              <TopSong
+                key={item.id}
+                item={item}
+                index={index}
+                isActive={audioPlayerOpen && activeAudio?.id === item.id}
+                onPlay={handleTopSongPlay}
+              />
+            ))}
             {audioItems.length === 0 ? <p className="text-sm text-stone-500">No songs published yet.</p> : null}
           </div>
           <Link href="/media/audio" className="mt-6 inline-flex items-center gap-2 text-sm font-black text-[#F839A9]">
@@ -159,6 +221,71 @@ export default function MediaExperience({ user, media, dashboardHref }: Props) {
       </section>
 
       <MediaInfoDialog item={selectedItem} onClose={() => setSelectedItemId(null)} />
+
+      {activeAudio && audioPlayerOpen ? (
+        <section className="fixed inset-x-3 bottom-3 z-50 sm:inset-x-5 sm:bottom-5">
+          <div className="mx-auto grid max-w-[1500px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-[1.35rem] border border-[#f8d2e7] bg-[#fff5fb]/95 p-3 shadow-[0_22px_70px_-26px_rgba(83,18,55,.5)] backdrop-blur-xl lg:grid-cols-[minmax(210px,280px)_minmax(360px,1fr)_48px] lg:px-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <MediaPoster item={activeAudio} className="h-14 w-14 shrink-0 rounded-xl shadow-sm lg:h-16 lg:w-16" />
+              <div className="min-w-0 flex-1">
+                <strong className="block truncate text-sm font-black">{activeAudio.title}</strong>
+                <span className="block truncate text-xs font-semibold text-stone-500">
+                  {activeAudio.featuredArtists || "franke'"}
+                </span>
+              </div>
+              <FaHeart className="hidden shrink-0 text-base text-[#F839A9] sm:block" aria-hidden="true" />
+            </div>
+
+            {audioIsLocked ? (
+              <div className="col-span-2 flex min-w-0 items-center justify-center gap-3 text-center lg:col-span-1">
+                <p className="text-sm font-semibold text-stone-600">
+                  {user
+                    ? "Upgrade your membership to access this media."
+                    : "You must be signed in to stream this content."}
+                </p>
+                <Link
+                  href={user ? "/#memberships" : "/login"}
+                  className="shrink-0 rounded-full bg-[#F839A9] px-4 py-2 text-xs font-black text-white"
+                >
+                  {user ? "View plans" : "Sign in"}
+                </Link>
+              </div>
+            ) : activeAudioSource ? (
+              <SleekAudioPlayer
+                key={activeAudio.id}
+                src={activeAudioSource}
+                autoPlay
+                previewLimitSeconds={shouldLimitAudioToPreview ? activeAudio.previewSeconds : undefined}
+                previewStartSeconds={shouldLimitAudioToPreview ? activeAudio.previewStartSeconds ?? 0 : undefined}
+                previewEndSeconds={shouldLimitAudioToPreview ? activeAudio.previewEndSeconds ?? undefined : undefined}
+                variant="playerBar"
+                onPrevious={activeAudioIndex > 0 ? () => selectAudioAt(activeAudioIndex - 1) : undefined}
+                onNext={activeAudioIndex >= 0 && activeAudioIndex < audioItems.length - 1 ? () => selectAudioAt(activeAudioIndex + 1) : undefined}
+                onShuffle={audioItems.length > 1 ? () => {
+                  const candidates = audioItems.filter((item) => item.id !== activeAudio.id);
+                  const nextItem = candidates[Math.floor(Math.random() * candidates.length)];
+                  if (nextItem) setActiveAudio(nextItem);
+                } : undefined}
+                onEnded={activeAudioIndex >= 0 && activeAudioIndex < audioItems.length - 1 ? () => selectAudioAt(activeAudioIndex + 1) : undefined}
+                className="col-span-2 min-w-0 lg:col-span-1"
+              />
+            ) : (
+              <p className="col-span-2 min-w-0 text-center text-sm font-semibold text-stone-500 lg:col-span-1">
+                No playable source has been added for this track yet.
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setAudioPlayerOpen(false)}
+              className="col-start-2 row-start-1 grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#f4c4de] bg-white text-xl text-stone-700 transition hover:text-[#F839A9] lg:col-start-3 lg:row-start-1"
+              aria-label="Close player"
+            >
+              <RiCloseLine />
+            </button>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

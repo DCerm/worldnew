@@ -441,24 +441,25 @@ if (! class_exists('WorldNewCommunityBridge')) {
             );
         }
 
-        private function get_clean_product_price_html($product) {
+        private function get_clean_product_price_html($product, $currency = '') {
             if (! $product || ! method_exists($product, 'get_price')) {
                 return '';
             }
 
             $price = (string) $product->get_price();
+            $price_args = $currency ? array('currency' => strtoupper((string) $currency)) : array();
 
             if (method_exists($product, 'is_on_sale') && $product->is_on_sale()) {
                 $regular_price = method_exists($product, 'get_regular_price') ? (string) $product->get_regular_price() : '';
                 $sale_price = method_exists($product, 'get_sale_price') ? (string) $product->get_sale_price() : '';
 
                 if ($regular_price !== '' && $sale_price !== '' && function_exists('wc_price')) {
-                    return '<del>' . wc_price($regular_price) . '</del> <ins>' . wc_price($sale_price) . '</ins>';
+                    return '<del>' . wc_price($regular_price, $price_args) . '</del> <ins>' . wc_price($sale_price, $price_args) . '</ins>';
                 }
             }
 
             if ($price !== '' && function_exists('wc_price')) {
-                return wc_price($price);
+                return wc_price($price, $price_args);
             }
 
             return method_exists($product, 'get_price_html') ? (string) $product->get_price_html() : '';
@@ -851,10 +852,10 @@ if (! class_exists('WorldNewCommunityBridge')) {
             }
             ?>
             <section class="worldnew-checkout-trust-panel" aria-label="World New secure checkout">
-                <p class="worldnew-checkout-trust-panel__eyebrow">World New Checkout</p>
-                <h2>Secure purchase, instant access.</h2>
-                <p>Your order is processed by WooCommerce and protected by the payment provider. Downloads are delivered to your account after purchase.</p>
-                <div class="worldnew-checkout-trust-panel__badges">
+                <p class="worldnew-checkout-trust-panel__eyebrow">Checkout</p>
+                <h2 class="bric">Secure purchase, instant access.</h2>
+                <p>Your order is processed securely and protected by our payment partners. You will be able to download your item(s) after purchase.</p>
+                <div class="worldnew-checkout-trust-panel__badges mhide">
                     <span>Secure payment</span>
                     <span>Account downloads</span>
                     <span>Community-ready pricing</span>
@@ -945,7 +946,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 }
                 .woocommerce-checkout .woocommerce form.checkout {
                     display: grid;
-                    grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+                    grid-template-columns: minmax(0, 1.1fr);
                     gap: 22px;
                 }
                 .woocommerce-checkout .woocommerce .col2-set,
@@ -1009,6 +1010,9 @@ if (! class_exists('WorldNewCommunityBridge')) {
                     .woocommerce-checkout .woocommerce #order_review_heading,
                     .woocommerce-checkout .woocommerce #order_review {
                         margin-top: 16px;
+                    }
+                    .worldnew-checkout-trust-panel__badges {
+                        display: none;
                     }
                 }
             </style>
@@ -1302,7 +1306,13 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 }
             }
 
-            WC()->cart->empty_cart();
+            $checkout_action = ! empty($payload['checkout_action']) && 'cart' === $payload['checkout_action']
+                ? 'cart'
+                : 'checkout';
+
+            if ('checkout' === $checkout_action) {
+                WC()->cart->empty_cart();
+            }
 
             $cart_added = WC()->cart->add_to_cart(
                 $product_id,
@@ -1317,7 +1327,9 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 exit;
             }
 
-            $checkout_url = wc_get_checkout_url();
+            $checkout_url = 'cart' === $checkout_action && function_exists('wc_get_cart_url')
+                ? wc_get_cart_url()
+                : wc_get_checkout_url();
 
             if (! empty($payload['gift_context']) && is_array($payload['gift_context'])) {
                 $gift_context = $payload['gift_context'];
@@ -2415,6 +2427,9 @@ if (! class_exists('WorldNewCommunityBridge')) {
             $product_id   = isset($validated['product_id']) ? (int) $validated['product_id'] : 0;
             $variation_id = isset($validated['variation_id']) ? (int) $validated['variation_id'] : 0;
             $use_community_price = ! empty($validated['use_community_price']);
+            $checkout_action = isset($validated['checkout_action']) && 'cart' === sanitize_key($validated['checkout_action'])
+                ? 'cart'
+                : 'checkout';
             $gift_context = isset($validated['gift_recipient']) && is_array($validated['gift_recipient'])
                 ? $validated['gift_recipient']
                 : null;
@@ -2441,6 +2456,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 'product_id'   => $product_id,
                 'variation_id' => $variation_id > 0 ? $variation_id : 0,
                 'gift_context' => $gift_context,
+                'checkout_action' => $checkout_action,
             );
 
             if ($use_community_price) {
@@ -3179,7 +3195,16 @@ if (! class_exists('WorldNewCommunityBridge')) {
             $preview_start_seconds = (int) get_post_meta($post->ID, '_worldnew_video_preview_start_seconds', true);
             $preview_end_seconds = (int) get_post_meta($post->ID, '_worldnew_video_preview_end_seconds', true);
             $stream_url = (string) get_post_meta($post->ID, '_worldnew_video_stream_url', true);
-            $poster_url = (string) get_post_meta($post->ID, '_worldnew_video_poster_url', true);
+            $legacy_poster_url = (string) get_post_meta($post->ID, '_worldnew_video_poster_url', true);
+            $portrait_poster_url = (string) get_post_meta($post->ID, '_worldnew_video_portrait_poster_url', true);
+            $landscape_poster_url = (string) get_post_meta($post->ID, '_worldnew_video_landscape_poster_url', true);
+            if (! $landscape_poster_url) {
+                $landscape_poster_url = $legacy_poster_url;
+            }
+            $poster_display = (string) get_post_meta($post->ID, '_worldnew_video_poster_display', true);
+            if (! in_array($poster_display, array('portrait', 'landscape'), true)) {
+                $poster_display = 'landscape';
+            }
             ?>
             <div class="options_group worldnew-video-options">
                 <p class="form-field">
@@ -3266,9 +3291,22 @@ if (! class_exists('WorldNewCommunityBridge')) {
                     <button type="button" class="button worldnew-select-video-file" style="margin-top:6px;">Select video</button>
                 </p>
                 <p class="form-field">
-                    <label for="worldnew_video_poster_url"><strong>Poster URL override</strong></label>
-                    <input type="url" id="worldnew_video_poster_url" name="worldnew_video_poster_url" value="<?php echo esc_attr($poster_url); ?>" class="widefat worldnew-video-file-url" data-worldnew-library-type="image" placeholder="Uses product image by default" />
-                    <button type="button" class="button worldnew-select-video-file" style="margin-top:6px;">Select image</button>
+                    <label for="worldnew_video_portrait_poster_url"><strong>Portrait poster</strong></label>
+                    <input type="url" id="worldnew_video_portrait_poster_url" name="worldnew_video_portrait_poster_url" value="<?php echo esc_attr($portrait_poster_url); ?>" class="widefat worldnew-video-file-url" data-worldnew-library-type="image" placeholder="Vertical artwork, ideally 2:3 or 9:16" />
+                    <button type="button" class="button worldnew-select-video-file" style="margin-top:6px;">Upload or select portrait poster</button>
+                </p>
+                <p class="form-field">
+                    <label for="worldnew_video_landscape_poster_url"><strong>Landscape poster</strong></label>
+                    <input type="url" id="worldnew_video_landscape_poster_url" name="worldnew_video_landscape_poster_url" value="<?php echo esc_attr($landscape_poster_url); ?>" class="widefat worldnew-video-file-url" data-worldnew-library-type="image" placeholder="Wide artwork, ideally 16:9; uses product image by default" />
+                    <button type="button" class="button worldnew-select-video-file" style="margin-top:6px;">Upload or select landscape poster</button>
+                </p>
+                <p class="form-field">
+                    <label for="worldnew_video_poster_display"><strong>Poster shown on the frontend</strong></label>
+                    <select id="worldnew_video_poster_display" name="worldnew_video_poster_display">
+                        <option value="landscape" <?php selected($poster_display, 'landscape'); ?>>Landscape poster</option>
+                        <option value="portrait" <?php selected($poster_display, 'portrait'); ?>>Portrait poster</option>
+                    </select>
+                    <span class="description">This choice controls video cards, featured media, and player artwork.</span>
                 </p>
             </div>
             <script>
@@ -3495,7 +3533,20 @@ if (! class_exists('WorldNewCommunityBridge')) {
             update_post_meta($post_id, '_worldnew_video_preview_start_seconds', $preview_start_seconds);
             update_post_meta($post_id, '_worldnew_video_preview_end_seconds', $preview_end_seconds);
             update_post_meta($post_id, '_worldnew_video_stream_url', isset($_POST['worldnew_video_stream_url']) ? esc_url_raw(wp_unslash($_POST['worldnew_video_stream_url'])) : '');
-            update_post_meta($post_id, '_worldnew_video_poster_url', isset($_POST['worldnew_video_poster_url']) ? esc_url_raw(wp_unslash($_POST['worldnew_video_poster_url'])) : '');
+            $portrait_poster_url = isset($_POST['worldnew_video_portrait_poster_url']) ? esc_url_raw(wp_unslash($_POST['worldnew_video_portrait_poster_url'])) : '';
+            $landscape_poster_url = isset($_POST['worldnew_video_landscape_poster_url']) ? esc_url_raw(wp_unslash($_POST['worldnew_video_landscape_poster_url'])) : '';
+            $poster_display = isset($_POST['worldnew_video_poster_display']) ? sanitize_text_field(wp_unslash($_POST['worldnew_video_poster_display'])) : 'landscape';
+            if (! in_array($poster_display, array('portrait', 'landscape'), true)) {
+                $poster_display = 'landscape';
+            }
+            $selected_poster_url = 'portrait' === $poster_display
+                ? ($portrait_poster_url ?: $landscape_poster_url)
+                : ($landscape_poster_url ?: $portrait_poster_url);
+
+            update_post_meta($post_id, '_worldnew_video_portrait_poster_url', $portrait_poster_url);
+            update_post_meta($post_id, '_worldnew_video_landscape_poster_url', $landscape_poster_url);
+            update_post_meta($post_id, '_worldnew_video_poster_display', $poster_display);
+            update_post_meta($post_id, '_worldnew_video_poster_url', $selected_poster_url);
         }
 
         private function sanitize_album_package_tracks($raw_tracks) {
@@ -4985,12 +5036,11 @@ if (! class_exists('WorldNewCommunityBridge')) {
             if (is_wp_error($albums_url)) {
                 $albums_url = home_url('/');
             }
-            $download_all_url = is_object($product) && method_exists($product, 'add_to_cart_url')
+            $add_to_cart_url = is_object($product) && method_exists($product, 'add_to_cart_url')
                 ? $product->add_to_cart_url()
                 : add_query_arg('add-to-cart', $product_id, home_url('/'));
-            $price_html = is_object($product) && method_exists($product, 'get_price_html')
-                ? $product->get_price_html()
-                : '';
+            $buy_now_url = $this->get_music_checkout_url($product_id);
+            $price_html = $this->get_clean_product_price_html($product, 'GBP');
 
             status_header(200);
             nocache_headers();
@@ -5014,9 +5064,6 @@ if (! class_exists('WorldNewCommunityBridge')) {
                             <h1><?php echo esc_html($title); ?></h1>
                             <p class="worldnew-album-artist"><?php echo esc_html($artist); ?> <span class="worldnew-album-artist-heart" aria-hidden="true"><svg viewBox="0 0 512 512" focusable="false"><path d="M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8C512 115.5 461.8 56 392.4 44.6c-45.6-7.5-92 7.3-124.6 39.9L256 96.3l-11.8-11.8c-32.6-32.6-79-47.4-124.6-39.9C50.2 56 0 115.5 0 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z"></path></svg></span></p>
                             <p class="worldnew-album-meta"><?php echo esc_html($this->format_album_track_count(count($tracks))); ?> • Released <?php echo esc_html($released); ?></p>
-                            <?php if ($price_html) : ?>
-                                <p class="worldnew-album-price"><?php echo wp_kses_post($price_html); ?></p>
-                            <?php endif; ?>
                             <?php if ($about) : ?>
                                 <p class="worldnew-album-summary hidden"><?php echo esc_html($about); ?></p>
                             <?php endif; ?>
@@ -5030,10 +5077,16 @@ if (! class_exists('WorldNewCommunityBridge')) {
                                     </span>
                                     Play All
                                 </button>
-                                <a class="worldnew-album-btn worldnew-album-btn--ghost" href="<?php echo esc_url($download_all_url); ?>">
-                                    <span aria-hidden="true">↓</span>
-                                    Download All
+                            </div>
+
+                            <div class="worldnew-album-purchase-row">
+                                <?php if ($price_html) : ?>
+                                    <p class="worldnew-album-price"><?php echo wp_kses_post($price_html); ?></p>
+                                <?php endif; ?>
+                                <a class="worldnew-album-cart-btn" href="<?php echo esc_url($add_to_cart_url); ?>" aria-label="Add album to cart" title="Add to cart">
+                                    <svg viewBox="0 0 576 512" focusable="false" aria-hidden="true"><path d="M528.12 301.319l47.273-208C578.806 78.288 567.391 64 552.001 64H159.208l-9.166-44.81C147.758 8.033 137.94 0 126.551 0H24C10.745 0 0 10.745 0 24v16c0 13.255 10.745 24 24 24h69.883l70.425 344.278C145.565 418.961 128 439.124 128 464c0 26.51 21.49 48 48 48s48-21.49 48-48c0-18.614-10.598-34.736-26.08-42.705h180.164C362.598 429.264 352 445.386 352 464c0 26.51 21.49 48 48 48s48-21.49 48-48c0-18.614-10.598-34.736-26.08-42.705l5.518-24.276C430.851 352.288 419.436 338 404.046 338H186.06l-6.545-32h324.393c11.39 0 21.208-8.033 23.492-19.19l.72-3.491z"></path></svg>
                                 </a>
+                                <a class="worldnew-album-buy-now" href="<?php echo esc_url($buy_now_url); ?>">Buy Now</a>
                             </div>
 
                             <div class="worldnew-album-donate">
@@ -5133,7 +5186,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 body .worldnew-album-page .worldnew-album-copy h1 { margin: 0; font-size: clamp(1.2rem, 2vw, 1.5rem) !important; line-height: 1.02; letter-spacing: -.055em; }
                 .worldnew-album-artist { margin: 10px 0 8px; color: #F839A9; font-size: 1.1rem; font-weight: 800; }
                 .worldnew-album-meta { margin: 0; color: #6b7280; font-weight: 600; }
-                .worldnew-album-price { display: inline-flex; margin: 14px 0 0; border-radius: 999px; background: #fff0f8; padding: 9px 14px; color: #F839A9; font-size: 1rem; font-weight: 800; }
+                .worldnew-album-price { display: inline-flex; margin: 0; border-radius: 999px; background: #fff0f8; padding: 11px 16px; color: #F839A9; font-size: 1rem; font-weight: 800; white-space: nowrap; }
                 .worldnew-album-price .amount { color: #F839A9; }
                 .worldnew-album-summary { margin: 18px 0 0; max-width: 46ch; color: #111827; font-size: 1.05rem; line-height: 1.55; }
                 .worldnew-album-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
@@ -5141,6 +5194,10 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 .worldnew-album-btn svg { width: 14px; height: 14px; display: block; fill: currentColor; }
                 .worldnew-album-btn--primary { border-color: transparent; background: #F839A9; color: #fff; box-shadow: 0 18px 32px -22px rgba(248,57,169,.95); }
                 .worldnew-album-btn--ghost { background: #fff; color: #F839A9; }
+                .worldnew-album-purchase-row { display: flex; align-items: center; flex-wrap: nowrap; gap: 10px; margin-top: 14px; }
+                .worldnew-album-cart-btn { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid rgba(248,57,169,.28); border-radius: 999px; background: #fff; color: #F839A9; text-decoration: none; }
+                .worldnew-album-cart-btn svg { width: 18px; height: 18px; fill: currentColor; }
+                .worldnew-album-buy-now { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 999px; padding: 11px 22px; background: #F839A9; color: #fff; font-weight: 800; text-decoration: none; white-space: nowrap; }
                 .worldnew-album-donate { margin-top: 22px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; border: 1px solid rgba(248,57,169,.16); border-radius: 18px; padding: 14px; background: #fff5fb; box-shadow: 0 18px 40px -34px rgba(248,57,169,.75); }
                 .worldnew-album-artist-heart { display: inline-flex; width: .82em; height: .82em; margin-left: 4px; color: #F839A9; vertical-align: -.05em; }
                 .worldnew-album-artist-heart svg { display: block; width: 100%; height: 100%; fill: currentColor; }
@@ -5193,6 +5250,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
                     .worldnew-album-art-wrap { max-width: 300px; }
                     body .worldnew-album-page .worldnew-album-copy h1 { font-size: 2rem!important; }
                     .worldnew-album-summary { font-size: .98rem; }
+                    .worldnew-album-purchase-row { flex-wrap: wrap; }
                     .worldnew-album-donate { grid-template-columns: auto 1fr; }
                     .worldnew-album-donate a { grid-column: 1 / -1; text-align: center; }
                     .worldnew-album-tabs { gap: 22px; margin-top: 30px; }
@@ -5808,13 +5866,24 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 $preview_end_seconds = 0;
             }
 
-            $poster_url = (string) get_post_meta($post->ID, '_worldnew_video_poster_url', true);
-            if (! $poster_url && is_object($product) && method_exists($product, 'get_image_id')) {
+            $portrait_poster_url = (string) get_post_meta($post->ID, '_worldnew_video_portrait_poster_url', true);
+            $landscape_poster_url = (string) get_post_meta($post->ID, '_worldnew_video_landscape_poster_url', true);
+            if (! $landscape_poster_url) {
+                $landscape_poster_url = (string) get_post_meta($post->ID, '_worldnew_video_poster_url', true);
+            }
+            if (! $landscape_poster_url && is_object($product) && method_exists($product, 'get_image_id')) {
                 $image_id = (int) $product->get_image_id();
                 if ($image_id > 0) {
-                    $poster_url = (string) wp_get_attachment_image_url($image_id, 'large');
+                    $landscape_poster_url = (string) wp_get_attachment_image_url($image_id, 'large');
                 }
             }
+            $poster_display = (string) get_post_meta($post->ID, '_worldnew_video_poster_display', true);
+            if (! in_array($poster_display, array('portrait', 'landscape'), true)) {
+                $poster_display = 'landscape';
+            }
+            $poster_url = 'portrait' === $poster_display
+                ? ($portrait_poster_url ?: $landscape_poster_url)
+                : ($landscape_poster_url ?: $portrait_poster_url);
 
             $category_slugs = wp_get_post_terms($post->ID, 'product_cat', array('fields' => 'slugs'));
             $category_slugs = is_array($category_slugs) ? $category_slugs : array();
@@ -5833,6 +5902,9 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 'stream_url'              => $this->resolve_video_stream_url($product, (string) get_post_meta($post->ID, '_worldnew_video_stream_url', true)),
                 'cover_image_url'         => $poster_url,
                 'poster_image_url'        => $poster_url,
+                'portrait_poster_url'     => $portrait_poster_url,
+                'landscape_poster_url'    => $landscape_poster_url,
+                'poster_display'          => $poster_display,
                 'price'                   => '' !== $price ? (float) $price : null,
                 'currency'                => function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'GBP',
                 'is_featured'             => false,
@@ -6473,6 +6545,8 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 .worldnew-track-play.is-playing .worldnew-pause-icon { display:block; }
                 .worldnew-track-time { color:#111827; font-size:17px; font-weight:700; min-width:48px; font-variant-numeric:tabular-nums; }
                 .worldnew-audio-el { display:none; }
+                .bric {font-family:Bricolage Grotesque}
+                .mhide { display:block; }
                 @media (max-width:760px) {
                     .worldnew-music-player-shell { padding:14px; }
                     .worldnew-music-player-head { align-items:flex-start; gap:8px; }
@@ -6495,6 +6569,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
                     .worldnew-track-play { width:38px; height:38px; }
                     .worldnew-track-play svg { width:17px; height:17px; }
                     .worldnew-track-time { min-width:42px; font-size:15px; }
+                    .mhide { display:none!important;}
                 }
             </style>
             <script>

@@ -11,19 +11,23 @@ export async function GET(
   const user = await getCurrentUser();
   const { productId } = await params;
   const parsedProductId = Number(productId);
+  const requestUrl = new URL(request.url);
 
   if (!user) {
+    const returnTo = `${requestUrl.pathname}${requestUrl.search}`;
     return NextResponse.redirect(
-      buildPublicUrl(request, `/login?returnTo=/checkout/product/${encodeURIComponent(productId)}`)
+      buildPublicUrl(request, `/login?returnTo=${encodeURIComponent(returnTo)}`)
     );
   }
 
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = requestUrl;
     const returnTo = searchParams.get("returnTo");
+    const checkoutAction = searchParams.get("action") === "cart" ? "cart" : "checkout";
     const redirectTo = await getProductCheckoutRedirectUrl(parsedProductId, user, {
       returnTo,
       useCommunityPrice: true,
+      checkoutAction,
     });
 
     return NextResponse.redirect(redirectTo);

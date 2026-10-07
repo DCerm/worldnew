@@ -25,6 +25,10 @@ function formatPrice(amount: number | null | undefined, currency: string) {
     return "Buy Album";
   }
 
+  if (!currency || currency.toUpperCase() === "GBP") {
+    return `£${amount.toFixed(2)}`;
+  }
+
   return new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: currency || "GBP",
@@ -65,6 +69,7 @@ export default async function CommunityAlbumPage({
   const credits = [albumArtist, album.genre].filter(Boolean).join(" · ");
   const albumDisplayPrice = album.display_price ?? album.community_price ?? album.price;
   const albumCheckoutUrl = `/checkout/product/${album.id}`;
+  const albumCartUrl = `/checkout/product/${album.id}?action=cart`;
 
   return (
     <main className="min-h-screen bg-white text-stone-950">
@@ -107,24 +112,35 @@ export default async function CommunityAlbumPage({
               <p className="mt-1 text-sm font-black text-stone-500">
                 {tracks.length} track{tracks.length === 1 ? "" : "s"} · Released {formatReleaseDate(null)}
               </p>
-              <p className="mt-3 inline-flex rounded-full bg-[#fff0f7] px-4 py-2 text-sm font-black text-[#F839A9]">
-                Community price: {formatPrice(albumDisplayPrice, album.currency)}
-              </p>
               {details ? <p className="mt-6 max-w-2xl text-base leading-7 text-stone-700">{details}</p> : null}
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <a
                 href="#tracklist"
                 className="inline-flex items-center gap-2 rounded-full bg-[#F839A9] px-6 py-3 text-sm font-black text-white"
               >
                 <RiPlayFill /> Play All
               </a>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap">
+              <p className="shrink-0 rounded-full bg-[#fff0f7] px-4 py-3 text-sm font-black text-[#F839A9]">
+                {formatPrice(albumDisplayPrice, album.currency)}
+              </p>
+              <a
+                href={albumCartUrl}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#ffd1e9] bg-white text-xl text-[#F839A9]"
+                aria-label="Add album to cart"
+                title="Add to cart"
+              >
+                <RiShoppingCart2Line />
+              </a>
               <a
                 href={albumCheckoutUrl}
-                className="inline-flex items-center gap-2 rounded-full border border-[#ffd1e9] bg-white px-6 py-3 text-sm font-black text-[#F839A9]"
+                className="inline-flex shrink-0 items-center justify-center rounded-full bg-[#F839A9] px-7 py-3 text-sm font-black text-white"
               >
-                <RiShoppingCart2Line /> Buy Album · {formatPrice(albumDisplayPrice, album.currency)}
+                Buy Now
               </a>
             </div>
 
