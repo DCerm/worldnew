@@ -228,6 +228,7 @@ CREATE TABLE categories (
   slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL UNIQUE,
   description TEXT,
+  poster_display TEXT NOT NULL DEFAULT 'per-video' CHECK (poster_display IN ('per-video', 'portrait', 'landscape')),
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

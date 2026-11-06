@@ -140,7 +140,7 @@ export default async function CommunityGroupsPage() {
                   </p>
                 </div>
                 <Link href={`/community/${activeGroup.slug}`} className="rounded-full bg-stone-950 px-4 py-2 text-sm font-black text-white">
-                  Enter group
+                  Open
                 </Link>
               </div>
               <div className="grid min-h-[380px] place-items-center text-center">
@@ -148,9 +148,9 @@ export default async function CommunityGroupsPage() {
                   <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#fff0f7] text-3xl text-[#F839A9]">
                     <RiChat3Line />
                   </div>
-                  <h3 className="mt-4 text-xl font-black text-stone-950">Start from the group page</h3>
+                  <h3 className="mt-4 text-xl font-black text-stone-950">What&apos;s New</h3>
                   <p className="mt-2 max-w-md text-sm leading-6 text-stone-500">
-                    Topics and threads already work there. This overview keeps the community easy to scan before jumping in.
+                    Latest topics and threads in the group appear here.
                   </p>
                 </div>
               </div>

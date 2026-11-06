@@ -2,15 +2,102 @@
 
 import { useMemo, useState } from "react";
 
-import { saveWordPressMusicProductAction } from "@/app/actions";
+import { saveWordPressMusicProductAction, updateMusicSidebarHeadingAction } from "@/app/actions";
 import FormSubmitButton from "@/app/ui/form-submit-button";
 import type { WordPressMusicProduct } from "@/lib/wordpress";
 
 type Props = {
   products: WordPressMusicProduct[];
+  musicSidebarHeading: string;
 };
 
 const PAGE_SIZE = 12;
+
+function AlbumZipField({ initialUrl }: { initialUrl: string }) {
+  const [url, setUrl] = useState(initialUrl);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [error, setError] = useState("");
+
+  async function upload(file: File) {
+    if (file.size === 0) {
+      setError("The selected ZIP file is empty.");
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      setError("Choose a ZIP file.");
+      return;
+    }
+
+    setError("");
+    setProgress(0);
+    const uploadId = crypto.randomUUID();
+    const chunkSize = 768 * 1024;
+    const total = Math.ceil(file.size / chunkSize);
+    let uploadedBytes = 0;
+    const uploadChunk = (index: number) => {
+      const chunk = file.slice(index * chunkSize, Math.min(file.size, (index + 1) * chunkSize));
+      return new Promise<void>((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open("POST", `/api/uploads/albums?uploadId=${uploadId}&index=${index}&total=${total}`);
+        request.setRequestHeader("Content-Type", "application/octet-stream");
+        request.setRequestHeader("x-file-name", encodeURIComponent(file.name));
+        request.upload.onprogress = (event) => {
+          if (event.lengthComputable) setProgress(Math.min(99, Math.round(((uploadedBytes + event.loaded) / file.size) * 100)));
+        };
+        request.onload = () => {
+          try {
+            const data = JSON.parse(request.responseText) as { error?: string };
+            if (request.status < 200 || request.status >= 300) reject(new Error(data.error || "The ZIP upload failed."));
+            else {
+              uploadedBytes += chunk.size;
+              resolve();
+            }
+          } catch {
+            reject(new Error("The upload server returned an invalid response."));
+          }
+        };
+        request.onerror = () => reject(new Error("The ZIP upload failed. Check your connection and try again."));
+        request.send(chunk);
+      });
+    };
+    try {
+      const parallelIndices = Array.from({ length: Math.max(0, total - 1) }, (_, index) => index);
+      for (let start = 0; start < parallelIndices.length; start += 6) {
+        await Promise.all(parallelIndices.slice(start, start + 6).map(uploadChunk));
+      }
+      const finalChunk = file.slice((total - 1) * chunkSize);
+      const response = await fetch(`/api/uploads/albums?uploadId=${uploadId}&index=${total - 1}&total=${total}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream", "x-file-name": encodeURIComponent(file.name) },
+        body: finalChunk,
+      });
+      const result = await response.json() as { complete?: boolean; storedPath?: string; error?: string };
+      if (!response.ok || !result.complete || !result.storedPath) throw new Error(result.error || "The ZIP upload did not finish.");
+      setUrl(result.storedPath);
+      setProgress(null);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "The ZIP upload failed.");
+      setProgress(null);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="block space-y-1 text-xs font-semibold text-stone-600">
+        <span>Upload album ZIP (large files upload directly)</span>
+        <input type="file" accept=".zip,application/zip" onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          if (file) upload(file);
+          event.currentTarget.value = "";
+        }} className="block w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600" />
+      </label>
+      <input name="albumPackageZipUrl" value={url} onChange={(event) => setUrl(event.currentTarget.value)} placeholder="Or paste an existing public ZIP URL" className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-gray-700 placeholder:text-gray-400" />
+      <input type="hidden" name="albumZipUploadStatus" value={progress !== null ? "uploading" : "ready"} />
+      {progress !== null ? <p className="text-xs text-stone-500">Uploading album ZIP: {progress}%</p> : null}
+      {error ? <p role="alert" className="text-xs text-red-700">{error}</p> : null}
+    </div>
+  );
+}
 
 function getProductCategory(product: WordPressMusicProduct) {
   return product.kind === "bundle" ? "Album" : "Track";
@@ -62,6 +149,7 @@ function TrackFormFields({
   const albumOffer = product?.album_community_offer;
   const albumPackage = product?.album_package;
   const albumPackageMode = product?.album_package_mode ?? ((product?.album_track_product_ids?.length ?? 0) > 0 ? "existing_tracks" : "zip_package");
+  const [selectedPackageMode, setSelectedPackageMode] = useState<"existing_tracks" | "zip_package">(albumPackageMode);
   const selectedAlbumTrackIds = new Set(product?.album_track_product_ids ?? []);
 
   return (
@@ -179,7 +267,8 @@ function TrackFormFields({
                   type="radio"
                   name="albumPackageMode"
                   value="existing_tracks"
-                  defaultChecked={albumPackageMode === "existing_tracks"}
+                  checked={selectedPackageMode === "existing_tracks"}
+                  onChange={() => setSelectedPackageMode("existing_tracks")}
                   className="h-4 w-4 accent-[#F839A9]"
                 />
                 Use existing track products
@@ -194,7 +283,8 @@ function TrackFormFields({
                   type="radio"
                   name="albumPackageMode"
                   value="zip_package"
-                  defaultChecked={albumPackageMode === "zip_package"}
+                  checked={selectedPackageMode === "zip_package"}
+                  onChange={() => setSelectedPackageMode("zip_package")}
                   className="h-4 w-4 accent-[#F839A9]"
                 />
                 Use one album ZIP
@@ -205,12 +295,9 @@ function TrackFormFields({
             </label>
           </div>
           <div className="mt-2 grid gap-3 md:grid-cols-2">
-            <input
-              name="albumPackageZipUrl"
-              defaultValue={albumPackage?.zip_url ?? ""}
-              placeholder="Album ZIP download URL"
-              className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-gray-700 placeholder:text-gray-400"
-            />
+            {selectedPackageMode === "zip_package" ? (
+              <AlbumZipField initialUrl={albumPackage?.zip_url ?? ""} />
+            ) : null}
             <input
               name="albumCommunityPrice"
               defaultValue={albumOffer?.price ?? product?.community_price ?? ""}
@@ -255,8 +342,10 @@ function TrackFormFields({
               Allow individual track sales
             </label>
           </div>
+          {selectedPackageMode === "existing_tracks" ? (
+          <>
           <p className="mt-3 text-xs leading-5 text-stone-500">
-            Select existing track products below to create the community album tracklist. Use the ZIP field when the album should be delivered as one download package.
+            Select existing track products below to create the community album tracklist. Each selected song remains independently purchasable.
           </p>
           <input type="hidden" name="albumTrackSelectionEnabled" value="yes" />
           <div className="mt-4 rounded-xl border border-[#ffd1e9] bg-white p-3">
@@ -272,6 +361,8 @@ function TrackFormFields({
               )) : <p className="rounded-xl bg-[#fff8fc] p-3 text-xs text-stone-500">Create and publish at least one track first, then return here to add it to this album.</p>}
             </div>
           </div>
+          </>
+          ) : <p className="mt-3 text-xs leading-5 text-stone-500">This album is delivered as one ZIP package. Its songs can be listed for streaming, but are not separate purchase products.</p>}
         </fieldset>
       ) : null}
 
@@ -362,7 +453,7 @@ function TrackFormFields({
   );
 }
 
-export default function MusicCatalogManager({ products }: Props) {
+export default function MusicCatalogManager({ products, musicSidebarHeading }: Props) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<WordPressMusicProduct | null>(null);
   const [createKind, setCreateKind] = useState<"track" | "album">("track");
@@ -394,6 +485,11 @@ export default function MusicCatalogManager({ products }: Props) {
             <p className="mt-3 text-sm text-stone-600">
               Browse tracks and albums in a simple table. Use Edit when you need the full release settings.
             </p>
+            <form action={updateMusicSidebarHeadingAction} className="mt-4 flex max-w-xl flex-wrap items-center gap-2">
+              <label htmlFor="music-sidebar-heading" className="text-sm font-semibold text-stone-700">Media page music heading</label>
+              <input id="music-sidebar-heading" name="musicSidebarHeading" maxLength={60} defaultValue={musicSidebarHeading} className="min-w-48 flex-1 rounded-xl border border-stone-200 px-3 py-2 text-sm" />
+              <button className="rounded-xl bg-[#F839A9] px-4 py-2 text-sm font-bold text-white">Save heading</button>
+            </form>
           </div>
           <div className="flex flex-wrap gap-2">
             <button

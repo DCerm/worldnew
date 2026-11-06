@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { WordNewMusicTracklist } from "@/app/media/audio/WordNewMusicTracklist";
+import { formatDescription } from "@/lib/description";
 import type { WordPressMusicTrack } from "@/lib/wordpress";
 
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
   details: string;
   credits: string;
   hasPaidCommunityAccess: boolean;
+  artworkUrl?: string | null;
 };
 
 const tabs = ["tracklist", "details", "credits"] as const;
@@ -19,6 +21,7 @@ export function AlbumDetailTabs({
   details,
   credits,
   hasPaidCommunityAccess,
+  artworkUrl,
 }: Props) {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("tracklist");
 
@@ -48,6 +51,7 @@ export function AlbumDetailTabs({
             hasPaidCommunityAccess={hasPaidCommunityAccess}
             showCartButton
             title="Tracklist"
+            artworkUrl={artworkUrl}
           />
         ) : (
           <div className="rounded-[1.5rem] border border-dashed border-[#ffd1e9] bg-[#fff8fc] p-8 text-sm font-semibold text-stone-500">
@@ -58,7 +62,7 @@ export function AlbumDetailTabs({
 
       {activeTab === "details" ? (
         <div className="rounded-[1.5rem] border border-[#ffd1e9] bg-white p-6 text-sm leading-7 text-stone-700 shadow-sm">
-          {details || "No album details have been added yet."}
+          {details ? formatDescription(details).map((paragraph, index) => <p key={index} className="mb-4 last:mb-0">{paragraph}</p>) : "No album details have been added yet."}
         </div>
       ) : null}
 

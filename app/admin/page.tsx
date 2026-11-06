@@ -3,11 +3,12 @@ import Image from "next/image";
 
 import {
   createCommunityGroupAction,
+  createCommunityPostAction,
+  createCommentAction,
   createCommunityTopicAction,
   updateCommunityGroupAction,
   updateCommunityGroupSortOrderAction,
   updateCommunityTopicSortOrderAction,
-  updateGlobalCoverAction,
 } from "@/app/actions";
 import { requireAdmin } from "@/lib/auth";
 import {
@@ -154,6 +155,11 @@ export default async function AdminPage({
             <div className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-5">
                 <h3 className="text-xl font-bold text-stone-900">Latest events</h3>
+                <form action={createCommunityPostAction} className="rounded-2xl border border-[#ffd1e9] bg-[#fff8fc] p-4">
+                  <label className="block text-sm font-black text-stone-900" htmlFor="admin-feed-post">Post an artist update</label>
+                  <textarea id="admin-feed-post" name="body" required maxLength={5000} rows={3} placeholder="Share an update with the community..." className="mt-3 w-full rounded-xl border border-stone-200 bg-white p-3 text-sm" />
+                  <button className="mt-3 rounded-full bg-[#F839A9] px-5 py-2.5 text-sm font-black text-white">Publish update</button>
+                </form>
                 {latestEvents.map((post) => (
                   <article key={post.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                     <div className="flex items-center justify-between gap-3">
@@ -161,6 +167,19 @@ export default async function AdminPage({
                       <p className="text-xs text-stone-500">{new Date(post.createdAt).toLocaleString()}</p>
                     </div>
                     <p className="mt-2 text-md text-stone-700">{post.body}</p>
+                    <div className="mt-4 space-y-2 border-t border-[#ffe0ef] pt-3">
+                      {post.comments.map((comment) => (
+                        <div key={comment.id} className="text-sm text-stone-700">
+                          <p><strong>{comment.authorName}:</strong> {comment.body}</p>
+                          {comment.replies.map((reply) => <p key={reply.id} className="ml-5 mt-1"><strong>{reply.authorName}:</strong> {reply.body}</p>)}
+                        </div>
+                      ))}
+                      <form action={createCommentAction} className="flex gap-2">
+                        <input type="hidden" name="postId" value={post.id} />
+                        <input name="body" required maxLength={2000} placeholder="Write a comment..." className="min-w-0 flex-1 rounded-full border border-stone-200 px-4 py-2 text-sm" />
+                        <button className="rounded-full bg-stone-950 px-4 py-2 text-xs font-black text-white">Comment</button>
+                      </form>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -171,7 +190,7 @@ export default async function AdminPage({
                   <p className="mt-2 text-sm text-stone-600">
                     This image is shown across member and artist profile headers.
                   </p>
-                  <form action={updateGlobalCoverAction} className="mt-4 space-y-3">
+                  <form action="/api/admin/global-cover" method="post" encType="multipart/form-data" className="mt-4 space-y-3">
                     <input
                       name="globalCoverImageFile"
                       type="file"

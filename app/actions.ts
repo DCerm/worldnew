@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
@@ -172,13 +172,30 @@ async function saveUploadedMediaFile(
   return `/uploads/media/${filename}`;
 }
 
-function resolveAppAbsoluteUrl(relativePath: string) {
+function resolveAppAbsoluteUrl(relativePath: string, requestOrigin?: string) {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim();
+  const configuredHost = configuredUrl ? new URL(configuredUrl).hostname : "";
+  const configuredIsLocal = ["localhost", "127.0.0.1", "::1"].includes(configuredHost);
   const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.APP_URL?.trim() ||
-    "http://localhost:3000";
+    requestOrigin && (!configuredUrl || (process.env.NODE_ENV === "production" && configuredIsLocal))
+      ? requestOrigin
+      : configuredUrl || "http://localhost:3000";
 
   return new URL(relativePath, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
+}
+
+async function getRequestOrigin() {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
+  const protocol = requestHeaders.get("x-forwarded-proto") || "http";
+  if (!host || host.includes(",") || !["http", "https"].includes(protocol)) return undefined;
+
+  try {
+    const origin = new URL(`${protocol}://${host}`);
+    return origin.origin;
+  } catch {
+    return undefined;
+  }
 }
 
 async function saveUploadedPosterFile(
@@ -738,7 +755,9 @@ export async function updateGlobalCoverAction(formData: FormData) {
   const user = await requireAdmin();
   const sql = requireDatabase();
   const uploadedCoverUrl = await saveUploadedProfileImage(user.id, "cover", formData.get("globalCoverImageFile"));
-  const coverImageUrl = uploadedCoverUrl ?? String(formData.get("globalCoverImageUrl") ?? "").trim();
+  const coverImageUrl = uploadedCoverUrl
+    ? resolveAppAbsoluteUrl(uploadedCoverUrl)
+    : String(formData.get("globalCoverImageUrl") ?? "").trim();
 
   try {
     if (!coverImageUrl) {
@@ -765,13 +784,29 @@ export async function updateGlobalCoverAction(formData: FormData) {
       "Unable to update global cover settings. Please run the latest database migration.",
       "error"
     );
-    return;
+    redirect("/admin?error=global-cover-update");
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   revalidatePath("/admin");
   revalidatePath("/admin/profile");
+}
+
+export async function updateMusicSidebarHeadingAction(formData: FormData) {
+  const user = await requireAdmin();
+  const sql = requireDatabase();
+  const heading = String(formData.get("musicSidebarHeading") ?? "").trim().slice(0, 60) || "Top Songs";
+  await sql`
+    insert into app_settings (setting_key, setting_value, updated_by, updated_at)
+    values ('music_sidebar_heading', ${heading}, ${user.id}, now())
+    on conflict (setting_key) do update
+    set setting_value = excluded.setting_value, updated_by = excluded.updated_by, updated_at = excluded.updated_at
+  `;
+  revalidatePath("/admin");
+  revalidatePath("/admin/music");
+  revalidatePath("/media");
+  await setToast("Music sidebar heading updated.");
 }
 
 function parseMembershipFeatures(featuresInput: string) {
@@ -1169,6 +1204,11 @@ export async function startGiftMembershipCheckoutAction(formData: FormData) {
 export async function saveWordPressMusicProductAction(formData: FormData) {
   await requireAdmin();
 
+  if (String(formData.get("albumZipUploadStatus") ?? "") === "uploading") {
+    await setToast("Please wait for the album ZIP upload to finish before saving.", "error");
+    return;
+  }
+
   const productId = parseOptionalPositiveInt(String(formData.get("productId") ?? ""));
   const releaseKindInput = String(formData.get("releaseKind") ?? "track").trim();
   const releaseKind = releaseKindInput === "album" ? "album" : "track";
@@ -1192,6 +1232,14 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
   const albumPackageModeInput = String(formData.get("albumPackageMode") ?? "").trim();
   const albumPackageMode = albumPackageModeInput === "existing_tracks" ? "existing_tracks" : "zip_package";
   const albumPackageZipUrl = String(formData.get("albumPackageZipUrl") ?? "").trim();
+  let resolvedAlbumZipUrl = albumPackageZipUrl;
+  if (resolvedAlbumZipUrl.startsWith("/uploads/albums/")) {
+    resolvedAlbumZipUrl = resolveAppAbsoluteUrl(resolvedAlbumZipUrl, await getRequestOrigin());
+  }
+  if (resolvedAlbumZipUrl && !/\.zip(?:$|[?#])/i.test(resolvedAlbumZipUrl)) {
+    await setToast("Album package URL must point to a ZIP file.", "error");
+    return;
+  }
   const albumCommunityPriceRaw = String(formData.get("albumCommunityPrice") ?? "").trim();
   const albumCommunityPriceInput = albumCommunityPriceRaw || communityPriceInput;
   const albumMinimumOfferPriceInput = String(formData.get("albumMinimumOfferPrice") ?? "").trim();
@@ -1294,7 +1342,7 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
       communityPlaybackMode,
       albumShowOnCommunity: releaseKind === "album" ? showOnCommunity : false,
       albumPackageMode: releaseKind === "album" ? albumPackageMode : null,
-      albumPackageZipUrl,
+      albumPackageZipUrl: resolvedAlbumZipUrl,
       albumCommunityPrice:
         parsedAlbumCommunityPrice !== null
           ? parsedAlbumCommunityPrice.toFixed(2)
@@ -1326,7 +1374,7 @@ export async function saveWordPressMusicProductAction(formData: FormData) {
 }
 
 export async function createCommunityPostAction(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireAdmin();
   const sql = requireDatabase();
   const body = String(formData.get("body") ?? "").trim();
 
@@ -1675,6 +1723,10 @@ export async function updateCategoryAction(formData: FormData) {
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
+  const requestedPosterDisplay = String(formData.get("posterDisplay") ?? "per-video");
+  const posterDisplay = ["per-video", "portrait", "landscape"].includes(requestedPosterDisplay)
+    ? requestedPosterDisplay
+    : "per-video";
   const slug = slugify(name);
 
   if (!categoryId || !name || !slug) {
@@ -1689,11 +1741,21 @@ export async function updateCategoryAction(formData: FormData) {
         name = ${name},
         slug = ${slug},
         description = ${description || null},
+        poster_display = ${posterDisplay},
         updated_at = now()
       where id = ${categoryId}
     `;
   } catch {
-    await setToast("Could not update category. Try another name.", "error");
+    try {
+      await sql`
+        update categories
+        set name = ${name}, slug = ${slug}, description = ${description || null}, updated_at = now()
+        where id = ${categoryId}
+      `;
+      await setToast("Category saved. Apply database migration 010 to save the Reels poster display setting.", "info");
+    } catch {
+      await setToast("Could not update category. Try another name.", "error");
+    }
     return;
   }
 
@@ -1701,6 +1763,8 @@ export async function updateCategoryAction(formData: FormData) {
   revalidatePath("/admin/categories");
   revalidatePath("/admin/videos");
   revalidatePath("/media");
+  revalidatePath("/media/category/reels");
+  revalidatePath("/media/watch");
   await setToast("Category updated.");
 }
 

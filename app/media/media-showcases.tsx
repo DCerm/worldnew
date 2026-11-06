@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { RiArrowLeftSLine, RiArrowRightSLine, RiInformationLine, RiPlayFill } from "react-icons/ri";
 
 import { SleekAudioPlayer, SleekVideoPlayer } from "@/app/ui/media-player";
@@ -98,13 +98,58 @@ export function HoverPreviewCard({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [showLockedCta, setShowLockedCta] = useState(false);
+  const [placeholderHeight, setPlaceholderHeight] = useState<number | null>(null);
+  const [expandedStyle, setExpandedStyle] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    transform: string;
+    transformOrigin: string;
+  } | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const allowed = canAccessMediaClient(user, item);
   const canPreview = allowed && item.mediaType === "video" && Boolean(item.playbackUrl);
+  const isPortraitVideo = item.mediaType === "video" && item.posterDisplay === "portrait";
+  const resolvedPosterAspect = item.mediaType === "video"
+    ? isPortraitVideo ? "aspect-[2/3]" : "aspect-[16/9]"
+    : posterAspect;
   const lockedCta = !allowed ? getLockedMediaCta(user) : null;
-  const expansionClass = expandable
-    ? "md:hover:-translate-y-3 md:hover:scale-[1.45] lg:hover:scale-[1.58] 2xl:hover:scale-[1.7] md:hover:origin-top-left"
-    : "md:hover:-translate-y-1";
+
+  const handlePointerEnter = (event: MouseEvent<HTMLDivElement>) => {
+    setIsHovered(true);
+    const card = cardRef.current;
+    if (!expandable || !card || !window.matchMedia("(min-width: 768px)").matches) return;
+
+    const rect = card.getBoundingClientRect();
+    const maxHeight = window.innerHeight - 24;
+    const scale = Math.min(1.58, window.innerWidth / 3 / rect.width, maxHeight / rect.height);
+    const originX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const originY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const grownLeft = rect.left - (scale - 1) * originX;
+    const grownRight = rect.right + (scale - 1) * (rect.width - originX);
+    const grownTop = rect.top - (scale - 1) * originY;
+    const grownBottom = rect.bottom + (scale - 1) * (rect.height - originY);
+    let dx = grownLeft < 12 ? 12 - grownLeft : 0;
+    let dy = grownTop < 12 ? 12 - grownTop : 0;
+    if (grownRight + dx > window.innerWidth - 12) dx += window.innerWidth - 12 - (grownRight + dx);
+    if (grownBottom + dy > window.innerHeight - 12) dy += window.innerHeight - 12 - (grownBottom + dy);
+
+    setPlaceholderHeight(rect.height);
+    setExpandedStyle({
+      left: rect.left + dx,
+      top: rect.top + dy,
+      width: rect.width,
+      transform: `scale(${scale})`,
+      transformOrigin: `${originX}px ${originY}px`,
+    });
+  };
+
+  const handlePointerLeave = () => {
+    setIsHovered(false);
+    setExpandedStyle(null);
+    setPlaceholderHeight(null);
+  };
 
   useEffect(() => {
     const video = videoRef.current;
@@ -134,10 +179,11 @@ export function HoverPreviewCard({
   }, [canPreview, isHovered, item.playbackUrl, item.previewEndSeconds, item.previewSeconds, item.previewStartSeconds]);
 
   return (
+    <div className="relative w-full" style={placeholderHeight !== null ? { height: placeholderHeight } : undefined} onMouseEnter={handlePointerEnter} onMouseLeave={handlePointerLeave}>
     <article
-      className={`group/card relative z-0 w-full rounded-xl border border-stone-100 bg-white shadow-[0_18px_45px_-34px_rgba(15,23,42,.55)] transition-[transform,box-shadow] duration-300 ease-out hover:z-30 md:hover:shadow-[0_30px_70px_-36px_rgba(248,57,169,.75)] ${expansionClass}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      ref={cardRef}
+      style={expandedStyle ? { ...expandedStyle, position: "fixed", zIndex: 100, transition: "transform 300ms ease-out, box-shadow 300ms ease-out" } : undefined}
+      className={`group/card relative z-0 w-full rounded-xl border border-stone-100 bg-white shadow-[0_18px_45px_-34px_rgba(15,23,42,.55)] transition-[transform,box-shadow] duration-300 ease-out ${expandedStyle ? "md:shadow-[0_30px_70px_-36px_rgba(248,57,169,.75)]" : ""}`}
     >
       <Link
         href={`/media/watch/${item.id}`}
@@ -149,7 +195,7 @@ export function HoverPreviewCard({
           }
         }}
       >
-        <div className={`relative ${posterAspect} overflow-hidden bg-stone-200`}>
+        <div className={`relative ${resolvedPosterAspect} overflow-hidden bg-stone-950`}>
           {canPreview && isHovered ? (
             <video
               ref={videoRef}
@@ -168,12 +214,13 @@ export function HoverPreviewCard({
                   void event.currentTarget.play().catch(() => undefined);
                 }
               }}
-              className="hidden h-full w-full object-cover md:block"
+              className={`hidden h-full w-full md:block ${isPortraitVideo ? "object-contain" : "object-cover"}`}
             />
           ) : null}
           <MediaPoster
             item={item}
-            className={`h-full w-full transition duration-500 group-hover:scale-105 ${canPreview && isHovered ? "md:hidden" : ""}`}
+            fit={isPortraitVideo ? "object-contain" : "object-cover"}
+            className={`h-full w-full transition duration-500 ${isPortraitVideo ? "" : "group-hover:scale-105"} ${canPreview && isHovered ? "md:hidden" : ""}`}
           />
           <span className="absolute left-3 top-3 rounded-full bg-stone-950/85 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
             {item.mediaType}
@@ -216,6 +263,7 @@ export function HoverPreviewCard({
         ) : null}
       </div>
     </article>
+    </div>
   );
 }
 

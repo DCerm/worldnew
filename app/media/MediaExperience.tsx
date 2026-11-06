@@ -19,6 +19,7 @@ type Props = {
   user: AuthUser | null;
   media: MediaCard[];
   dashboardHref: string;
+  musicSidebarHeading?: string;
 };
 
 function TopSong({
@@ -65,7 +66,7 @@ function canOpenAudioPlayer(user: AuthUser | null, item: MediaCard) {
   return false;
 }
 
-export default function MediaExperience({ user, media, dashboardHref }: Props) {
+export default function MediaExperience({ user, media, dashboardHref, musicSidebarHeading = "Top Songs" }: Props) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [activeAudio, setActiveAudio] = useState<MediaCard | null>(null);
   const [audioPlayerOpen, setAudioPlayerOpen] = useState(false);
@@ -199,7 +200,7 @@ export default function MediaExperience({ user, media, dashboardHref }: Props) {
 
         <aside className="h-fit rounded-2xl border border-stone-100 bg-white p-6 shadow-[0_24px_65px_-44px_rgba(15,23,42,.75)] lg:sticky lg:top-28">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-2xl font-black">Top Songs</h2>
+            <h2 className="text-2xl font-black">{musicSidebarHeading}</h2>
             <Link href="/media/audio" className="text-sm font-black text-[#F839A9]">View all</Link>
           </div>
           <div className="space-y-3">

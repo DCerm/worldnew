@@ -8,6 +8,7 @@ import {
 } from "react-icons/ri";
 
 import { requireUser } from "@/lib/auth";
+import { createCommentAction, createCommunityPostAction } from "@/app/actions";
 import {
   DEFAULT_PROFILE_COVER_URL,
   getCommunityFeed,
@@ -129,6 +130,14 @@ export default async function DashboardPage({
                 <Link href="/community" className="text-sm font-black text-[#F839A9]">View community <RiArrowRightLine className="inline" /></Link>
               </div>
 
+              {user.roles.some((role) => role === "artist_admin" || role === "super_admin") ? (
+                <form action={createCommunityPostAction} className="rounded-2xl border border-[#ffd1e9] bg-[#fff8fc] p-4">
+                  <label className="block text-sm font-black">Post an artist update</label>
+                  <textarea name="body" required rows={3} placeholder="Share an update with the community..." className="mt-3 w-full rounded-xl border border-stone-200 bg-white p-3 text-sm" />
+                  <button className="mt-3 rounded-full bg-[#F839A9] px-5 py-2.5 text-sm font-black text-white">Publish update</button>
+                </form>
+              ) : null}
+
               {feed.length > 0 ? feed.map((post) => (
                 <article key={post.id} className="rounded-[1.5rem] border border-stone-100 bg-white p-5 shadow-[0_18px_48px_-38px_rgba(15,23,42,.65)]">
                   <div className="flex items-center justify-between gap-4">
@@ -140,6 +149,14 @@ export default async function DashboardPage({
                   </div>
                   <p className="mt-4 whitespace-pre-line text-sm leading-6 text-stone-700">{post.body || "Shared an update with the community."}</p>
                   <div className="mt-4 flex items-center gap-2 text-xs font-bold text-stone-500"><RiChat3Line className="text-[#F839A9]" /> {post.comments.length} {post.comments.length === 1 ? "reply" : "replies"}</div>
+                  <div className="mt-3 space-y-2 border-t border-[#ffe0ef] pt-3">
+                    {post.comments.map((comment) => <p key={comment.id} className="text-sm text-stone-700"><strong>{comment.authorName}:</strong> {comment.body}</p>)}
+                    <form action={createCommentAction} className="flex gap-2">
+                      <input type="hidden" name="postId" value={post.id} />
+                      <input name="body" required maxLength={2000} placeholder="Write a comment..." className="min-w-0 flex-1 rounded-full border border-stone-200 px-4 py-2 text-sm" />
+                      <button className="rounded-full bg-stone-950 px-4 py-2 text-xs font-black text-white">Comment</button>
+                    </form>
+                  </div>
                 </article>
               )) : (
                 <div className="rounded-[1.5rem] border border-dashed border-[#ffc5e4] bg-[#fff8fc] p-6 text-sm text-stone-600">Your feed is ready for the first community update.</div>

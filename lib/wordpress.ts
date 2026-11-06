@@ -47,6 +47,7 @@ export type WordPressMusicTrack = {
   title: string;
   artist: string;
   genre: string;
+  description?: string | null;
   duration: string;
   preview_seconds?: number | null;
   preview_start_seconds?: number | null;

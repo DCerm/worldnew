@@ -41,7 +41,7 @@ function productToTrack(product: WordPressMusicProduct): WordPressMusicTrack {
 }
 
 function isCommunityVisible(product: WordPressMusicProduct) {
-  return product.show_on_community !== false;
+  return product.status === "publish" && product.show_on_community !== false;
 }
 
 function isCommunityAlbumVisible(product: WordPressMusicProduct) {
@@ -66,7 +66,7 @@ export default async function AudioExperiencePage() {
   ]);
   const dashboardHref = user ? getDashboardDestination(user) : "/login";
   const albums = products.filter(isCommunityAlbumVisible);
-  const albumTrackIds = new Set(albums.flatMap((album) => album.bundle_tracks.map((track) => track.id)));
+  const albumTrackIds = new Set(albums.flatMap((album) => album.album_track_product_ids ?? []));
   const standaloneTracks = products
     .filter((product) => product.kind === "track" && isCommunityVisible(product) && !albumTrackIds.has(product.id))
     .map(productToTrack);

@@ -4,6 +4,7 @@ import { FaHeart } from "react-icons/fa";
 import { RiPlayFill, RiShoppingCart2Line } from "react-icons/ri";
 
 import { AlbumDetailTabs } from "@/app/media/audio/albums/[id]/AlbumDetailTabs";
+import { formatDescription } from "@/lib/description";
 import { getCurrentUser, getDashboardDestination } from "@/lib/auth";
 import { getWordPressMusicProductsForAdmin } from "@/lib/wordpress";
 
@@ -112,7 +113,7 @@ export default async function CommunityAlbumPage({
               <p className="mt-1 text-sm font-black text-stone-500">
                 {tracks.length} track{tracks.length === 1 ? "" : "s"} · Released {formatReleaseDate(null)}
               </p>
-              {details ? <p className="mt-6 max-w-2xl text-base leading-7 text-stone-700">{details}</p> : null}
+              {details ? <div className="mt-6 max-w-2xl space-y-3 text-base leading-7 text-stone-700">{formatDescription(details).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -159,9 +160,9 @@ export default async function CommunityAlbumPage({
 
           <aside className="rounded-[1.75rem] border border-[#edf2f7] bg-white p-6 shadow-[0_28px_80px_-58px_rgba(15,23,42,.7)]">
             <h2 className="text-xl font-black">About this album</h2>
-            <p className="mt-6 border-b border-stone-200 pb-5 text-sm leading-7 text-stone-700">
-              {album.short_description || details || "Thank you for listening."}
-            </p>
+            <div className="mt-6 space-y-3 border-b border-stone-200 pb-5 text-sm leading-7 text-stone-700">
+              {formatDescription(album.short_description || details || "Thank you for listening.").map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+            </div>
             <dl className="mt-5 grid grid-cols-[110px_1fr] gap-4 text-sm">
               <dt className="font-semibold text-stone-500">Artist</dt>
               <dd className="font-black text-stone-950">{albumArtist}</dd>
@@ -181,6 +182,7 @@ export default async function CommunityAlbumPage({
             details={details}
             credits={credits}
             hasPaidCommunityAccess={Boolean(user?.activePlanCode)}
+            artworkUrl={album.cover_image_url}
           />
         </div>
       </section>

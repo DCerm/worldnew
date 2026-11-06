@@ -219,6 +219,18 @@ if (! class_exists('WorldNewCommunityBridge')) {
 
             register_rest_route(
                 'worldnew/v1',
+                '/album-upload/chunk',
+                array(
+                    'methods'             => 'POST',
+                    'permission_callback' => function () {
+                        return current_user_can('edit_products');
+                    },
+                    'callback'            => array($this, 'handle_album_upload_chunk'),
+                )
+            );
+
+            register_rest_route(
+                'worldnew/v1',
                 '/music/catalog',
                 array(
                     'methods'             => 'GET',
@@ -2519,6 +2531,76 @@ if (! class_exists('WorldNewCommunityBridge')) {
             return $tabs;
         }
 
+        public function handle_album_upload_chunk($request) {
+            $upload_id = (string) $request->get_param('upload_id');
+            $chunk_index = absint($request->get_param('chunk_index'));
+            $total_chunks = absint($request->get_param('total_chunks'));
+            $filename = sanitize_file_name((string) $request->get_param('filename'));
+            $body = $request->get_body();
+
+            if (! preg_match('/^[a-f0-9-]{20,50}$/i', $upload_id) || $total_chunks < 1 || $chunk_index >= $total_chunks || '' === $body || 'zip' !== strtolower(pathinfo($filename, PATHINFO_EXTENSION))) {
+                return new WP_Error('worldnew_album_upload_invalid', 'Invalid album ZIP upload chunk.', array('status' => 400));
+            }
+
+            $uploads = wp_upload_dir();
+            $chunk_dir = trailingslashit($uploads['basedir']) . 'worldnew-album-chunks/' . $upload_id;
+            if (! wp_mkdir_p($chunk_dir)) {
+                return new WP_Error('worldnew_album_upload_storage', 'Could not prepare temporary album upload storage.', array('status' => 500));
+            }
+            $chunk_path = trailingslashit($chunk_dir) . sprintf('%08d.part', $chunk_index);
+            if (false === file_put_contents($chunk_path, $body, LOCK_EX)) {
+                return new WP_Error('worldnew_album_upload_write', 'Could not store album ZIP upload chunk.', array('status' => 500));
+            }
+
+            if ($chunk_index !== $total_chunks - 1) {
+                return rest_ensure_response(array('complete' => false));
+            }
+
+            $target_dir = trailingslashit($uploads['basedir']) . 'worldnew-albums';
+            if (! wp_mkdir_p($target_dir)) {
+                return new WP_Error('worldnew_album_upload_storage', 'Could not prepare album storage.', array('status' => 500));
+            }
+            $target_name = wp_unique_filename($target_dir, sanitize_file_name(pathinfo($filename, PATHINFO_FILENAME)) . '.zip');
+            $target_path = trailingslashit($target_dir) . $target_name;
+            $assembled = fopen($target_path, 'wb');
+            if (! $assembled) {
+                return new WP_Error('worldnew_album_upload_write', 'Could not assemble the album ZIP.', array('status' => 500));
+            }
+
+            $signature = '';
+            for ($index = 0; $index < $total_chunks; $index++) {
+                $part_path = trailingslashit($chunk_dir) . sprintf('%08d.part', $index);
+                if (! is_readable($part_path)) {
+                    fclose($assembled);
+                    @unlink($target_path);
+                    return new WP_Error('worldnew_album_upload_missing_chunk', 'An album ZIP upload part is missing. Please retry the upload.', array('status' => 400));
+                }
+                $part = fopen($part_path, 'rb');
+                if (0 === $index) {
+                    $signature = (string) fread($part, 4);
+                    rewind($part);
+                }
+                stream_copy_to_stream($part, $assembled);
+                fclose($part);
+            }
+            fclose($assembled);
+
+            if (0 !== strpos($signature, 'PK')) {
+                @unlink($target_path);
+                return new WP_Error('worldnew_album_upload_bad_zip', 'The uploaded file is not a ZIP archive.', array('status' => 400));
+            }
+
+            foreach (glob(trailingslashit($chunk_dir) . '*.part') as $part_path) {
+                @unlink($part_path);
+            }
+            @rmdir($chunk_dir);
+
+            return rest_ensure_response(array(
+                'complete' => true,
+                'url'      => trailingslashit($uploads['baseurl']) . 'worldnew-albums/' . rawurlencode($target_name),
+            ));
+        }
+
         public function render_worldnew_music_product_data_panel() {
             global $post;
             ?>
@@ -2881,6 +2963,11 @@ if (! class_exists('WorldNewCommunityBridge')) {
                     <p class="description">Save or update this product, then use the WooCommerce <strong>Bundled Products</strong> tab to choose the existing track products and their order. Those child products stay individually purchasable and are also used for the community/website album tracklist.</p>
                 </div>
                 <div class="worldnew-album-zip-mode-panel">
+                <p class="form-field">
+                    <label for="worldnew_album_package_zip_file"><strong>Upload complete album ZIP</strong></label>
+                    <input type="file" id="worldnew_album_package_zip_file" accept=".zip,application/zip" />
+                    <span id="worldnew_album_zip_upload_status" class="description" style="display:block;">Optional. Large ZIP files upload in small resumable-size chunks and are saved to WordPress uploads. You can instead select an existing ZIP below.</span>
+                </p>
                 <div class="worldnew-album-package-grid">
                     <?php
                     $album_asset_fields = array(
@@ -3577,6 +3664,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
                     'position'              => max(1, $position),
                     'title'                 => $title,
                     'artist'                => isset($track['artist']) ? sanitize_text_field((string) $track['artist']) : '',
+                    'description'           => isset($track['description']) ? wp_kses_post((string) $track['description']) : '',
                     'duration'              => isset($track['duration']) ? sanitize_text_field((string) $track['duration']) : '',
                     'preview_seconds'       => max(5, min(600, $preview_seconds)),
                     'preview_start_seconds' => $preview_start_seconds,
@@ -3989,6 +4077,8 @@ if (! class_exists('WorldNewCommunityBridge')) {
 
             $gallery = $this->get_lovebox_media_gallery($product_id, $product_image_url);
             $occasions = $this->get_lovebox_occasions($product_id);
+            $reasons_heading = (string) get_post_meta($product_id, '_worldnew_lovebox_reasons_heading', true);
+            $reasons_heading = $reasons_heading ? $reasons_heading : 'Reasons to get a video';
             $price_html = $this->get_clean_product_price_html($product);
             $checkout_action = admin_url('admin-post.php');
 
@@ -4112,7 +4202,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
                             <?php endif; ?>
 
                             <div class="worldnew-cameo-reasons">
-                                <h3>Reasons to get a video</h3>
+                                <h3><?php echo esc_html($reasons_heading); ?></h3>
                                 <div>
                                     <?php foreach ($occasions as $occasion) : ?>
                                         <span><?php echo esc_html($occasion); ?></span>
@@ -4211,6 +4301,54 @@ if (! class_exists('WorldNewCommunityBridge')) {
             }
 
             wp_enqueue_media();
+            $album_upload_script = <<<'JS'
+(function($){$(function(){
+    var input=document.getElementById("worldnew_album_package_zip_file");
+    var target=document.getElementById("worldnew_album_package_zip_url");
+    var status=document.getElementById("worldnew_album_zip_upload_status");
+    var publish=document.getElementById("publish");
+    if(!input||!target||!status){return;}
+    input.addEventListener("change",async function(){
+        var file=input.files&&input.files[0];
+        if(!file){return;}
+        if(!/\.zip$/i.test(file.name)){status.textContent="Choose a ZIP file.";return;}
+        var uploadId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2);
+        var chunkSize=768*1024;
+        var total=Math.ceil(file.size/chunkSize);
+        if(publish){publish.disabled=true;}
+        status.textContent="Uploading album ZIP: 0%";
+        var sendChunk=async function(index){
+            var chunk=file.slice(index*chunkSize,Math.min(file.size,(index+1)*chunkSize));
+            var params=new URLSearchParams({upload_id:uploadId,chunk_index:String(index),total_chunks:String(total),filename:file.name});
+            var response=await fetch(__ENDPOINT__+"?"+params.toString(),{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/octet-stream","X-WP-Nonce":__NONCE__},body:chunk});
+            var result=await response.json();
+            if(!response.ok){throw new Error(result.message||"Upload failed.");}
+            return result;
+        };
+        try{
+            var parallelChunks=Array.from({length:Math.max(0,total-1)},function(_,index){return index;});
+            for(var start=0;start<parallelChunks.length;start+=6){
+                await Promise.all(parallelChunks.slice(start,start+6).map(sendChunk));
+                status.textContent="Uploading album ZIP: "+Math.round((Math.min(start+6,total-1)/total)*100)+"%";
+            }
+            var result=await sendChunk(total-1);
+            if(!result.complete||!result.url){throw new Error("Upload did not finish correctly.");}
+            target.value=result.url;
+            status.textContent="Album ZIP uploaded and linked.";
+        }catch(error){
+            status.textContent=error instanceof Error?error.message:"Album ZIP upload failed.";
+        }finally{
+            if(publish){publish.disabled=false;}
+        }
+    });
+});})(jQuery);
+JS;
+            $album_upload_script = str_replace(
+                array('__ENDPOINT__', '__NONCE__'),
+                array(wp_json_encode(rest_url('worldnew/v1/album-upload/chunk')), wp_json_encode(wp_create_nonce('wp_rest'))),
+                $album_upload_script
+            );
+            wp_add_inline_script('jquery-core', $album_upload_script);
         }
 
         public function register_lovebox_product_metabox() {
@@ -4237,6 +4375,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
             $about = (string) get_post_meta($post->ID, '_worldnew_lovebox_about', true);
             $profile_name = (string) get_post_meta($post->ID, '_worldnew_lovebox_profile_name', true);
             $profile_role = (string) get_post_meta($post->ID, '_worldnew_lovebox_profile_role', true);
+            $reasons_heading = (string) get_post_meta($post->ID, '_worldnew_lovebox_reasons_heading', true);
             $profile_image_id = absint(get_post_meta($post->ID, '_worldnew_lovebox_profile_image_id', true));
             $profile_image_url = $profile_image_id > 0 ? (string) wp_get_attachment_image_url($profile_image_id, 'thumbnail') : '';
             $media_rows = get_post_meta($post->ID, '_worldnew_lovebox_media_gallery', true);
@@ -4280,6 +4419,11 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 <div class="worldnew-lovebox-field">
                     <label for="worldnew_lovebox_profile_role">Profile role</label>
                     <input type="text" id="worldnew_lovebox_profile_role" name="worldnew_lovebox_profile_role" value="<?php echo esc_attr($profile_role); ?>" placeholder="Custom service." />
+                </div>
+                <div class="worldnew-lovebox-field">
+                    <label for="worldnew_lovebox_reasons_heading">Reasons heading</label>
+                    <input type="text" id="worldnew_lovebox_reasons_heading" name="worldnew_lovebox_reasons_heading" value="<?php echo esc_attr($reasons_heading); ?>" placeholder="Reasons to get a video" />
+                    <p class="description" style="margin:6px 0 0;">Changes the heading above the occasions shown on this Lovebox service.</p>
                 </div>
             </div>
 
@@ -4607,6 +4751,7 @@ if (! class_exists('WorldNewCommunityBridge')) {
             update_post_meta($post_id, '_worldnew_lovebox_about', isset($_POST['worldnew_lovebox_about']) ? wp_kses_post(wp_unslash($_POST['worldnew_lovebox_about'])) : '');
             update_post_meta($post_id, '_worldnew_lovebox_profile_name', isset($_POST['worldnew_lovebox_profile_name']) ? sanitize_text_field(wp_unslash($_POST['worldnew_lovebox_profile_name'])) : '');
             update_post_meta($post_id, '_worldnew_lovebox_profile_role', isset($_POST['worldnew_lovebox_profile_role']) ? sanitize_text_field(wp_unslash($_POST['worldnew_lovebox_profile_role'])) : '');
+            update_post_meta($post_id, '_worldnew_lovebox_reasons_heading', isset($_POST['worldnew_lovebox_reasons_heading']) ? sanitize_text_field(wp_unslash($_POST['worldnew_lovebox_reasons_heading'])) : '');
             update_post_meta($post_id, '_worldnew_lovebox_profile_image_id', isset($_POST['worldnew_lovebox_profile_image_id']) ? absint(wp_unslash($_POST['worldnew_lovebox_profile_image_id'])) : 0);
             $raw_occasions = isset($_POST['worldnew_lovebox_occasions']) ? (string) wp_unslash($_POST['worldnew_lovebox_occasions']) : '';
             $occasions = array_values(array_filter(array_map(
@@ -4896,8 +5041,10 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 $duration = ! empty($track['duration']) ? (string) $track['duration'] : gmdate('i:s', max(5, $preview_seconds));
 
                 $rows[] = array(
+                    'product_id'            => ! empty($track['product_id']) ? absint($track['product_id']) : 0,
                     'title'                 => ! empty($track['title']) ? (string) $track['title'] : basename((string) wp_parse_url($stream_url, PHP_URL_PATH)),
                     'artist'                => ! empty($track['artist']) ? (string) $track['artist'] : $album_artist,
+                    'description'           => ! empty($track['description']) ? (string) $track['description'] : '',
                     'duration'              => $duration,
                     'preview_seconds'       => max(5, $preview_seconds),
                     'preview_start_seconds' => max(0, $preview_start_seconds),
@@ -4939,8 +5086,10 @@ if (! class_exists('WorldNewCommunityBridge')) {
                 }
 
                 $rows[] = array(
+                    'product_id'            => (int) $child_id,
                     'title'                 => get_the_title($child_post),
                     'artist'                => (string) get_post_meta($child_id, '_worldnew_music_artist', true) ?: $album_artist,
+                    'description'           => (string) $child_post->post_content,
                     'duration'              => $duration,
                     'preview_seconds'       => $preview_seconds,
                     'preview_start_seconds' => $preview_start_seconds,
@@ -5712,7 +5861,8 @@ if (! class_exists('WorldNewCommunityBridge')) {
             $category_slugs = wp_get_post_terms($post->ID, 'product_cat', array('fields' => 'slugs'));
             $category_slugs = is_array($category_slugs) ? $category_slugs : array();
             $is_album = in_array('album', $category_slugs, true);
-            if (! $is_album && ! $this->is_music_product_compatible($product, $post->ID)) {
+            $is_track_category = (bool) array_intersect(array('track', 'tracks'), $category_slugs);
+            if (! $is_album && ! $is_track_category && ! $this->is_music_product_compatible($product, $post->ID)) {
                 return null;
             }
 
@@ -5754,9 +5904,10 @@ if (! class_exists('WorldNewCommunityBridge')) {
             if ($is_album) {
                 foreach ($this->get_album_track_rows($product, $post->ID) as $index => $track) {
                     $album_tracks[] = array(
-                        'id'                      => (int) $post->ID + $index + 1,
+                        'id'                      => ! empty($track['product_id']) ? (int) $track['product_id'] : (int) $post->ID + $index + 1,
                         'title'                   => (string) $track['title'],
                         'artist'                  => (string) $track['artist'],
+                        'description'             => isset($track['description']) ? (string) $track['description'] : '',
                         'genre'                   => (string) get_post_meta($post->ID, '_worldnew_music_genre', true),
                         'duration'                => (string) $track['duration'],
                         'preview_seconds'         => ! empty($track['preview_seconds']) ? (int) $track['preview_seconds'] : 30,
@@ -5827,7 +5978,10 @@ if (! class_exists('WorldNewCommunityBridge')) {
                     'enable_donation'               => get_post_meta($post->ID, '_worldnew_album_enable_donation', true) === 'yes',
                     'allow_individual_track_sales'  => get_post_meta($post->ID, '_worldnew_album_allow_individual_track_sales', true) === 'yes',
                 ),
-                'album_track_product_ids' => array_values(array_filter(array_map('absint', (array) get_post_meta($post->ID, '_worldnew_album_track_product_ids', true)))),
+                'album_track_product_ids' => array_values(array_unique(array_filter(array_merge(
+                    array_map('absint', (array) get_post_meta($post->ID, '_worldnew_album_track_product_ids', true)),
+                    $this->get_album_child_product_ids($product)
+                )))),
                 'bundle_tracks'           => $album_tracks,
             );
         }

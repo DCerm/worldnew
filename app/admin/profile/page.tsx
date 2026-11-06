@@ -1,5 +1,4 @@
 import {
-  updateGlobalCoverAction,
   updatePasswordAction,
   updateProfileAction,
 } from "@/app/actions";
@@ -74,7 +73,7 @@ export default async function AdminProfilePage() {
           <img src={profileCoverUrl} alt="Global cover preview" className="h-44 w-full object-cover" />
         </div>
 
-        <form action={updateGlobalCoverAction} className="mt-4 space-y-3">
+        <form action="/api/admin/global-cover?returnTo=%2Fadmin%2Fprofile" method="post" encType="multipart/form-data" className="mt-4 space-y-3">
           <label className="block text-sm font-semibold text-stone-700">
             Upload global cover image
             <input

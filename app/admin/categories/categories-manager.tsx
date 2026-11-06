@@ -9,6 +9,7 @@ type Category = {
   name: string;
   slug: string;
   description: string | null;
+  posterDisplay: "per-video" | "portrait" | "landscape";
 };
 
 type Props = {
@@ -142,6 +143,27 @@ export default function CategoriesManager({ categories }: Props) {
                 placeholder="Description"
                 className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm"
               />
+              {editingCategory.slug !== "reels" ? (
+                <input type="hidden" name="posterDisplay" value={editingCategory.posterDisplay} />
+              ) : null}
+              {editingCategory.slug === "reels" ? (
+                <fieldset key={editingCategory.id} className="rounded-2xl border border-stone-200 p-4">
+                  <legend className="px-1 text-sm font-semibold text-stone-800">Reels poster display</legend>
+                  <p className="mb-3 text-xs text-stone-500">This controls posters on media shelves and individual reel pages.</p>
+                  <div className="space-y-2">
+                    {([
+                      ["per-video", "Use each video's setting"],
+                      ["portrait", "Use portrait posters for all Reels"],
+                      ["landscape", "Use landscape posters for all Reels"],
+                    ] as const).map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2 text-sm text-stone-700">
+                        <input type="radio" name="posterDisplay" value={value} defaultChecked={editingCategory.posterDisplay === value} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
               <div className="flex items-center gap-2">
                 <button className="rounded-full bg-[#F839A9] px-4 py-2 text-xs font-semibold text-white">
                   Save changes

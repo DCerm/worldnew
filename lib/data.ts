@@ -43,6 +43,7 @@ export type MediaCard = {
   portraitPosterUrl: string | null;
   landscapePosterUrl: string | null;
   posterDisplay: "portrait" | "landscape";
+  categoryPosterDisplay?: "per-video" | "portrait" | "landscape";
   createdAt: string;
   planCodes: string[];
   tags: string[];
@@ -144,11 +145,13 @@ function wordpressAudioProductToMediaCard(product: WordPressMusicProduct): Media
 }
 
 async function getWordPressVideoMediaCards(): Promise<MediaCard[]> {
-  const products = await getWordPressMusicProductsForAdmin();
+  const [products, categories] = await Promise.all([getWordPressMusicProductsForAdmin(), getCategories()]);
+  const posterModes = new Map(categories.map((category) => [category.slug, category.posterDisplay]));
 
   return products
     .map(wordpressVideoProductToMediaCard)
-    .filter((item): item is MediaCard => Boolean(item));
+    .filter((item): item is MediaCard => Boolean(item))
+    .map((item) => applyCategoryPosterDisplay(item, posterModes.get(item.categorySlug ?? "")));
 }
 
 async function getWordPressAudioMediaCards(): Promise<MediaCard[]> {
@@ -214,7 +217,22 @@ export type CategoryRecord = {
   name: string;
   slug: string;
   description: string | null;
+  posterDisplay: "per-video" | "portrait" | "landscape";
 };
+
+function applyCategoryPosterDisplay(
+  item: MediaCard,
+  mode: "per-video" | "portrait" | "landscape" | null | undefined
+): MediaCard {
+  if (item.mediaType !== "video" || !mode || mode === "per-video") return item;
+  const categoryPoster = mode === "portrait" ? item.portraitPosterUrl : item.landscapePosterUrl;
+  if (!categoryPoster) return item;
+  return {
+    ...item,
+    posterDisplay: mode,
+    posterImageUrl: categoryPoster,
+  };
+}
 
 export type CommunityGroupSummary = {
   id: string;
@@ -465,22 +483,40 @@ export async function getMembershipPlans(
 
 export async function getCategories(): Promise<CategoryRecord[]> {
   return withDb(async (sql) => {
-    const rows = await sql<{
+    let rows: {
       id: string;
       name: string;
       slug: string;
       description: string | null;
-    }[]>`
-      select id, name, slug, description
-      from categories
-      order by name asc
-    `;
+      poster_display: "per-video" | "portrait" | "landscape" | null;
+    }[];
+
+    try {
+      rows = await sql<typeof rows>`
+        select id, name, slug, description, poster_display
+        from categories
+        order by name asc
+      `;
+    } catch {
+      const legacyRows = await sql<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+      }[]>`
+        select id, name, slug, description
+        from categories
+        order by name asc
+      `;
+      rows = legacyRows.map((row) => ({ ...row, poster_display: null }));
+    }
 
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
       slug: row.slug,
       description: row.description,
+      posterDisplay: row.poster_display === "portrait" || row.poster_display === "landscape" ? row.poster_display : "per-video",
     }));
   }, []);
 }
@@ -602,7 +638,7 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
       order by m.created_at desc
     `;
 
-    return rows.map((row) => ({
+    return rows.map((row) => applyCategoryPosterDisplay({
       id: row.id,
       title: row.title,
       description: row.description,
@@ -628,7 +664,7 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
       fullPlaybackUrl: row.playback_url
         ? createSignedMediaStreamUrl({ mediaId: row.id, mode: "full" })
         : null,
-    }));
+    }, undefined));
   }, []);
 
   const [wordpressVideos, wordpressAudios] = await Promise.all([
@@ -636,10 +672,13 @@ export async function getMediaLibrary(options: MediaLibraryOptions = {}): Promis
     getWordPressAudioMediaCards(),
   ]);
 
+  const categoryPosterModes = new Map((await getCategories()).map((category) => [category.slug, category.posterDisplay]));
   return [
     ...wordpressVideos,
     ...wordpressAudios,
-    ...localMedia.filter((item) => item.mediaType === "video"),
+    ...localMedia
+      .filter((item) => item.mediaType === "video")
+      .map((item) => applyCategoryPosterDisplay(item, categoryPosterModes.get(item.categorySlug ?? ""))),
   ];
 }
 
@@ -654,6 +693,7 @@ export async function getMediaItemById(mediaId: string): Promise<MediaCard | nul
     return wordpressAudio;
   }
 
+  const categoryPosterModes = new Map((await getCategories()).map((category) => [category.slug, category.posterDisplay]));
   return withDb(async (sql) => {
     const rows = await sql<{
       id: string;
@@ -743,7 +783,7 @@ export async function getMediaItemById(mediaId: string): Promise<MediaCard | nul
       return null;
     }
 
-    return {
+    return applyCategoryPosterDisplay({
       id: row.id,
       title: row.title,
       description: row.description,
@@ -769,7 +809,7 @@ export async function getMediaItemById(mediaId: string): Promise<MediaCard | nul
       fullPlaybackUrl: row.playback_url
         ? createSignedMediaStreamUrl({ mediaId: row.id, mode: "full" })
         : null,
-    };
+    }, categoryPosterModes.get(row.category_slug ?? ""));
   }, null);
 }
 
@@ -1219,6 +1259,15 @@ export async function getGlobalProfileCoverUrl(): Promise<string | null> {
 
     return rows[0]?.setting_value ?? null;
   }, null);
+}
+
+export async function getMusicSidebarHeading(): Promise<string> {
+  return withDb(async (sql) => {
+    const rows = await sql<{ setting_value: string | null }[]>`
+      select setting_value from app_settings where setting_key = 'music_sidebar_heading' limit 1
+    `;
+    return rows[0]?.setting_value?.trim() || "Top Songs";
+  }, "Top Songs");
 }
 
 export function canAccessMedia(user: AuthUser | null, media: MediaCard) {
